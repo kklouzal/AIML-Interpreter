@@ -1,0 +1,55 @@
+<aiml>
+	<topic name="TIME">
+		<category>
+			<pattern>HOW MUCH TIME *</pattern>
+			<template>
+				How much?
+			</template>
+		</category>
+		<category>
+			<pattern>4 *</pattern>
+			<that>HOW MUCH TIME *</that>
+			<template>
+				<random>
+					<li>That seems like a long time.</li>
+					<li>Only four <star/>?</li>
+				</random>
+			</template>
+		</category>
+		<category>
+			<pattern>FOUR *</pattern>
+			<that>HOW MUCH TIME *</that>
+			<template>
+				<srai>4 <star/></srai>
+			</template>
+		</category>
+		<category>
+			<pattern>*</pattern>
+			<template> 
+				<think><set name="topic">Time</set></think>
+			</template>
+		</category>
+	</topic>
+	<category>
+		<pattern>HELLO</pattern>
+		<template>
+			<random>
+				<li>Hey!</li>
+				<li>Hello.</li>
+				<li>Hi. How are you?</li>
+			</random>
+		</template>
+	</category>
+	<category>
+		<pattern>HI</pattern>
+		<template>
+			<srai>HELLO</srai>
+		</template>
+	</category>
+	<category>
+		<pattern>DO YOU KNOW WHO * IS?</pattern>
+		<template>
+			<srai>WHO IS <star/></srai>
+		</template>
+	</category>
+</aiml>
