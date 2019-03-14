@@ -47,7 +47,7 @@
 		</template>
 	</category>
 	<category>
-		<pattern>DO YOU KNOW WHO * IS?</pattern>
+		<pattern>DO YOU KNOW WHO * IS</pattern>
 		<template>
 			<srai>WHO IS <star/></srai>
 		</template>

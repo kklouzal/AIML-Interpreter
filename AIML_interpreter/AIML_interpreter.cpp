@@ -272,150 +272,82 @@ namespace AIML
 			}
 		}
 
-		//	0 = No Match			[ WORD != WORD ]
-		//	1 = Direct Word Match	[ WORD == WORD ]
-		//	2 = Direct * Match		[ WORD -> * ]
-		//	3 = Previous * Match	[ WORD -> (*<-WORD) ]
-		//
-		//	PatternWord must be supplied in all caps.
-		//	Do not check Previous * Match when bFirst is true.
-		const unsigned short CheckWords(const std::string& InputWord, std::list<std::string>::const_iterator& PatternWord, const bool bFirst) const
-		{
-			//	Debug: print *PatternWord to ensure we've not jacked the sequence up and are going in order.
-			//std::cout << "\t\t CheckWords-> " << *PatternWord << std::endl;
-			if (*PatternWord == "*") {
-				return 2;
-			}
-			else if (	equal(InputWord.begin(), InputWord.end(),
-						(*PatternWord).begin(), (*PatternWord).end(),
-						[](char Input, char Pattern) {
-							return toupper(Input) == Pattern;
-				})) {
-				return 1;
-			}
-			else if (!bFirst && *--PatternWord == "*") {
-				// Don't worry about incrementing the iterator back to where it was?
-				// Chances are the next 'InputWord' being checked will be of type 3.
-				// If the pattern match fails at this point we'll scrap this category anyways.
-				//	--I think all that's correct ?:D
-				return 3;
-			}
-			return 0;
-		}
-
 		std::string InputText(std::string InText) {
 			std::vector<Category*> Matches;
 
 			auto InWords = split(InText);
+			const auto Input_End = InWords.cend();
 
 			for (auto Cat : Category_List) {
-				auto PatWords = Cat.Pattern;
+				auto Input = InWords.cbegin();
+				auto Pattern = Cat.Pattern.cbegin();
 
-				auto PatIter = PatWords.cbegin();
-				auto InIter = InWords.cbegin();
+				const auto Pattern_Begin = Cat.Pattern.cbegin();	//	ToDo: Find a way to get rid of 'Pattern_Begin'
+				const auto Pattern_End = Cat.Pattern.cend();
 
-				bool bTryCategory = true;
-				while (bTryCategory) {
-					switch (CheckWords(*InIter, PatIter, (PatIter == PatWords.cbegin())))
-					{
-					case 0: bTryCategory = false; break;	//	Halt; No Match
+				bool InputEnd = false;
+				bool PatternEnd = false;
+				while (true) {
 
-					case 1:	//	Direct Word Match
-					{
-						std::cout << *InIter << "\tWORD Match\n";
-						auto PatternEnd = (++PatIter == PatWords.cend());
-						auto InputEnd = (++InIter == InWords.cend());
+					//	Direct Wildcard Match
+					if (*Pattern == "*") {
 						if (PatternEnd) {
-							if (InputEnd) {
-								//	Pattern END
-								//	Input	END
-								//	-- Complete match
-								bTryCategory = false;
-								//std::cout << "\tEnd Pattern & Input\n";
-							}
-							else {
-								//	Pattern END
-								//	Input	Remaining
-								//	-- Partial Input Match
-								bTryCategory = false;
-								//std::cout << "\tEnd Pattern\n";
-							}
+							//	Store previous wildcard value
+							std::cout << *Input << "\t-^\t" << *Pattern << std::endl;
 						}
-						else if (InputEnd) {
-							//	Pattern Remaining
-							//	Input	END
-							//	-- Partial pattern match (no match)
-							bTryCategory = false;
-							//std::cout << "\tEnd Input\n";
+						else {
+							//	Store direct wildcard value
+							std::cout << *Input << "\t->\t" << *Pattern << std::endl;
 						}
 					}
-					break;
-
-					case 2:	//	Direct * Match
-					{
-						std::cout << *InIter << "\t* Match\n";
-						auto PatternEnd = (++PatIter == PatWords.cend());
-						auto InputEnd = (++InIter == InWords.cend());
-
-						if (PatternEnd) {
-							if (InputEnd) {
-								//	Pattern END
-								//	Input	END
-								//	-- Complete match
-								bTryCategory = false;
-								//std::cout << "\tEnd Pattern & Input\n";
-							}
-							else {
-								//	Pattern END *
-								//	Continue processing input
-								PatIter--;
-							}
+					//	Direct Word Match
+					else if (equal((*Input).begin(), (*Input).end(), (*Pattern).begin(), (*Pattern).end(),
+						[](char I, char P) { return toupper(I) == P; })) {
+						//	Do nothing on word match?
+						std::cout << *Input << "\t->\t" << *Pattern << std::endl;
+					}
+					//	Previous wildcard match
+					else if (Pattern != Pattern_Begin && *--Pattern == "*") {
+						//	Store wildcard value
+						std::cout << *Input << "\t-^\t" << *Pattern << std::endl;
+					}
+					//	Mismatch
+					else {
+						if (Pattern != Pattern_Begin) {
+							std::cout << "Mismatch\n";
 						}
-						else if (InputEnd) {
-							//	Pattern Remaining
-							//	Input	END
-							//	-- Partial pattern match (no match)
-							bTryCategory = false;
-							//std::cout << "\tEnd Input\n";
+						break;	// Break to next category
+					}
+
+					//	Increase our iterators
+					InputEnd = (++Input == Input_End);
+					PatternEnd = (++Pattern == Pattern_End);
+					//	Check for pattern match
+					if (PatternEnd && InputEnd) {
+						//	Complete Match
+						std::cout << "Complete Match\n";
+						break;	// Break to next category
+					}
+					else if (PatternEnd) {
+						if (*--Pattern != "*") {
+							//	Partial Match
+							//	Pattern was fully matched
+							//	Input still has more words
+							std::cout << "Partial Match\n";
+							//	ToDo: Process the rest of 'Input'
+							break;	// Break to next category
 						}
 					}
-					break;
-
-					case 3:	//	Previous * Match
-					{
-						std::cout << *InIter << "\tPrevious * Match\n";
-						auto PatternEnd = (++PatIter == PatWords.cend());
-						auto InputEnd = (++InIter == InWords.cend());
-
-						if (PatternEnd) {
-							if (InputEnd) {
-								//	Pattern END
-								//	Input	END
-								//	-- Complete match
-								bTryCategory = false;
-								//std::cout << "\tEnd Pattern & Input\n";
-							}
-							else {
-								//	Pattern END *
-								//	Continue processing input
-								//	Already decremented in CheckWords()
-								//PatIter--;
-							}
+					else if (InputEnd) {
+						//	Incomplete Match
+						//	Pattern was not fully matched
+						//	Input ran out of words
+						if (Pattern != Pattern_Begin) {
+							std::cout << "Incomplete Match\n";
 						}
-						else if (InputEnd) {
-							//	Pattern Remaining
-							//	Input	END
-							//	-- Partial pattern match (no match)
-							bTryCategory = false;
-							//std::cout << "\tEnd Input\n";
-						}
-					}
-					break;
-
-					default: std::cout << "Pattern Matching Error" << std::endl; break;
+						break;	// Break to next category
 					}
 				}
-				//do stuff
 			}
 			return std::string("placeholder");
 		}
