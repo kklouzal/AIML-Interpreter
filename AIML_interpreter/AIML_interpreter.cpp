@@ -10,12 +10,25 @@
 #include <filesystem>
 #include <functional>
 #include <iostream>
+#include <sstream>
 #include "rapidxml.hpp"
 #include "rapidxml_utils.hpp"
 
 namespace AIML
 {
 	namespace fs = std::experimental::filesystem;
+
+	std::vector<std::string> split(const std::string& s, char delimiter=' ')
+	{
+		std::vector<std::string> tokens;
+		std::string token;
+		std::istringstream tokenStream(s);
+		while (std::getline(tokenStream, token, delimiter))
+		{
+			tokens.push_back(token);
+		}
+		return tokens;
+	}
 
 	class Category
 	{
@@ -25,9 +38,9 @@ namespace AIML
 		std::string That;		// Context limiter for this category
 		bool Srai;				// Rematch using this pattern
 		std::vector<std::list<std::string*>> Templates;	// Response templates
+		//	unordered_map 'SetList' string/string - Values to be set during template call
 
-		Category(std::string UsePattern, std::string UseTopic) : Pattern(UsePattern), Topic(UseTopic), Srai(false)
-		{}
+		Category(std::string UsePattern, std::string UseTopic) : Pattern(UsePattern), Topic(UseTopic), Srai(false) {}
 
 		~Category() {
 			for (auto Template : Templates) {
@@ -58,7 +71,6 @@ namespace AIML
 		}
 
 		void SetSRAI() { Srai = true; }
-
 		void SetThat(std::string UseThat) { That = UseThat; }
 	};
 
@@ -78,169 +90,102 @@ namespace AIML
 				Category.PrintData();
 			}
 		}
-
 		void DebugStars1() {
-			Stars[0] = "Quick";
-			Stars[1] = "Brown";
-			Stars[2] = "Fox";
-			Stars[3] = "Jumps";
-			Stars[4] = "Over";
-			Stars[5] = "The";
-			Stars[6] = "Lazy";
-			Stars[7] = "Dog";
+			Stars[0] = "Quick";	Stars[1] = "Brown";	Stars[2] = "Fox"; Stars[3] = "Jumps";
+			Stars[4] = "Over"; Stars[5] = "The"; Stars[6] = "Lazy";	Stars[7] = "Dog";
 		}
 		void DebugStars2() {
-			Stars[0] = "Pack";
-			Stars[1] = "My";
-			Stars[2] = "Box";
-			Stars[3] = "With";
-			Stars[4] = "Five";
-			Stars[5] = "Dozen";
-			Stars[6] = "Big";
-			Stars[7] = "Jugs";
+			Stars[0] = "Pack"; Stars[1] = "My";	Stars[2] = "Box"; Stars[3] = "With";
+			Stars[4] = "Five"; Stars[5] = "Dozen"; Stars[6] = "Big"; Stars[7] = "Jugs";
 		}
 
-		/*void walk(const rapidxml::xml_node<>* node, int indent = 0) {
-			const auto ind = std::string(indent * 4, ' ');
-			printf("%s", ind.c_str());
-
-			const rapidxml::node_type t = node->type();
-			switch (t) {
-			case rapidxml::node_element:
-			{
-				printf("<%.*s", node->name_size(), node->name());
-				for (const rapidxml::xml_attribute<>* a = node->first_attribute()
-					; a
-					; a = a->next_attribute()
-					) {
-					printf(" %.*s", a->name_size(), a->name());
-					printf("='%.*s'", a->value_size(), a->value());
-				}
-				printf(">\n");
-				printf("%s", ind.c_str());
-				printf("DATA:[%.*s]\n", node->value_size(), node->value());
-
-				for (const rapidxml::xml_node<>* n = node->first_node()
-					; n
-					; n = n->next_sibling()
-					) {
-					walk(n, indent + 1);
-				}
-				printf("%s</%.*s>\n", ind.c_str(), node->name_size(), node->name());
-			}
-			break;
-
-			case rapidxml::node_data:
-				printf("DATA:[%.*s]\n", node->value_size(), node->value());
-				break;
-
-			default:
-				printf("NODE-TYPE:%d\n", t);
-				break;
-			}
-		}*/
-
-		/*void TryWritePiece(std::string *Value){
-			if (Category_List.back().Templates.empty()) {
-				Category_List.back().Templates.emplace_back(std::list<std::string*>(1, Value));
-			}
-			else {
-				Category_List.back().Templates.back().emplace_back(Value);
-			}
-		}*/
 		//	Recursively walk through a TEMPLATE constructing response templates for an AIML::Category
-		void WalkTemplate(const rapidxml::xml_node<>* node) {
-
-			const rapidxml::node_type t = node->type();
-			switch (t) {
+		void WalkTemplate(const rapidxml::xml_node<>* node, bool IsThinking=false, bool IsSetting=false) {
+			switch (node->type()) {
 			case rapidxml::node_element:
 			{
 				//	Encountered <random>
-				if (strcmp(node->name(), "random") == 0) {
-					//	Set flag for use of random responses?
-					//	This could eliminate the use of double nested arrays
-					//		for single response patterns.
-					//std::cout << "<random> " << node->value() << std::endl;
-				}
+				if (strcmp(node->name(), "random") == 0) {}
 				//	Encountered <li>
 				else if (strcmp(node->name(), "li") == 0) {
 					//	Create a new Response List at the back of Templates
 					Category_List.back().Templates.emplace_back(std::list<std::string*>());
-					//TryWritePiece(new std::string(node->value()));
-					//std::cout << "<li> " << node->value() << std::endl;
+				}
+				//	Encountered <think>
+				else if (strcmp(node->name(), "think") == 0) {
+					//	Set children of this node to 'think' status
+					IsThinking = true;
 				}
 				//	Encountered <srai>
 				else if (strcmp(node->name(), "srai") == 0) {
 					//	Enable this category to use symbolic reduction (sari)
 					Category_List.back().SetSRAI();
-					//std::cout << "<srai> " << node->value() << std::endl;
 				}
 				else if (strcmp(node->name(), "star") == 0) {
 					//	Insert reference to appropriate <star/> value
 					Category_List.back().Templates.back().push_back(&Stars[0]);
-					//TryWritePiece(&Stars[0]);
-					//std::cout << "<star> " << node->value() << std::endl;
 				}
 				else if (strcmp(node->name(), "get") == 0) {
 					//	Insert reference to appropriate <get name='...'/> value
-					//auto VariableName = node->first_attribute("name");
-					//std::cout << "Variable Name: " << VariableName->value() << std::endl;
-					//Category_List.back().Templates.back().push_back(&Stars[0]);
+					auto VariableName = node->first_attribute("name");
+					std::cout << "Variable Name: " << VariableName->value() << std::endl;
+					Category_List.back().Templates.back().push_back(&Variables[VariableName->value()]);
 					//std::cout << "<get> " << node->value() << std::endl;
 				}
 				else if (strcmp(node->name(), "set") == 0) {
-					//	Update value to appropriate <set name='...'>...</set> value
-					//auto VariableName = node->first_attribute("name");
-					//std::cout << "Variable Name: " << VariableName->value() << std::endl;
-					//std::cout << "Variable Value: " << node->value() << std::endl;
+					//	Update reference to appropriate <set name='...'>...</set> value
+					auto VariableName = node->first_attribute("name");
+					std::cout << "Variable Name: " << VariableName->value() << std::endl;
+					std::cout << "Variable Value: " << node->value() << std::endl;
 					//Category_List.back().Templates.back().push_back(&Stars[0]);
 					//std::cout << "<set> " << node->value() << std::endl;
 				}
 				else {
-					printf("<%s> %s\n", node->name(), node->value());
+					printf("Unknown Tag <%s> %s\n", node->name(), node->value());
 					for (auto a = node->first_attribute(); a; a = a->next_attribute()) {
 						printf("<set/get %s", a->name());
 						printf("='%s'", a->value());
 						printf(">\n");
 					}
 				}
-
+				//	Walk through all children of this node
+				//	If this node is <think> set 'IsThinking' to true
 				for (auto n = node->first_node(); n; n = n->next_sibling()) {
-					WalkTemplate(n);
+					WalkTemplate(n, IsThinking);
 				}
 			}
 			break;
 
 			case rapidxml::node_data:
+			{
 				//	Add this data to the end of the current template
+				if (!IsThinking) {
 					if (Category_List.back().Templates.empty()) {
 						Category_List.back().Templates.emplace_back(std::list<std::string*>(1, new std::string(node->value())));
 					}
 					else {
 						Category_List.back().Templates.back().emplace_back(new std::string(node->value()));
 					}
-					//printf("DATA:[%s]\n", node->value());
-				break;
+				}
+			}
+			break;
 
-			default:
-				printf("NODE-TYPE:%d\n", t);
-				break;
+			default: printf("Unknown Node Type\n"); break;
 			}
 		}
 
 		void ParseCategories(rapidxml::xml_node<>* Root_Node, std::string UseTopic = "") {
-			for (rapidxml::xml_node<>* Category_Node = Root_Node->first_node("category"); Category_Node; Category_Node = Category_Node->next_sibling())
+			for (auto Category_Node = Root_Node->first_node("category"); Category_Node; Category_Node = Category_Node->next_sibling())
 			{
 				//	Dissect PATTERN
-				rapidxml::xml_node<>* Pattern_Node = Category_Node->first_node("pattern");
+				auto Pattern_Node = Category_Node->first_node("pattern");
 				if (Pattern_Node == NULL) {
 					std::cout << "Skipping Malformed Category: No PATTERN" << std::endl;
 					continue;
 				}
 				std::string Pattern = Pattern_Node->value();
-				//std::cout << Pattern << std::endl;
 				//	Dissect TEMPLATE
-				rapidxml::xml_node<>* Template_Node = Category_Node->first_node("template");
+				auto Template_Node = Category_Node->first_node("template");
 				if (Template_Node == NULL) {
 					std::cout << "Skipping Malformed Category: No TEMPLATE" << std::endl;
 					continue;
@@ -251,12 +196,11 @@ namespace AIML
 					WalkTemplate(Node);
 				}
 				//	Dissect THAT
-				rapidxml::xml_node<>* That_Node = Category_Node->first_node("that");
+				auto That_Node = Category_Node->first_node("that");
 				if (That_Node != NULL) {
 					std::string That = That_Node->value();
 					Category_List.back().SetThat(That);
 				}
-				std::cout << std::endl;
 			}
 		}
 
@@ -266,7 +210,6 @@ namespace AIML
 			fs::path AIML_Folder = fs::current_path().append("AIML");
 			std::cout << AIML_Folder << std::endl;
 			if (fs::exists(AIML_Folder) && fs::is_directory(AIML_Folder)) {
-				std::cout << "Found AIML Folder" << std::endl;
 				for (const auto& entry : fs::directory_iterator(AIML_Folder))
 				{
 					auto filename = entry.path().filename();
@@ -286,7 +229,7 @@ namespace AIML
 							for (rapidxml::xml_node<>* Topic_Node = Root_Node->first_node("topic"); Topic_Node; Topic_Node = Topic_Node->next_sibling())
 							{
 								if (strcmp(Topic_Node->name(), "topic") == 0) {
-									rapidxml::xml_attribute<>* Topic_Name = Topic_Node->first_attribute("name");
+									auto Topic_Name = Topic_Node->first_attribute("name");
 									if (Topic_Name == NULL) {
 										std::cout << "Skipping Malformed Topic: No NAME" << std::endl;
 										continue;
@@ -312,22 +255,152 @@ namespace AIML
 				XML.pop();
 			}
 		}
+
+		//	0 = No Match
+		//	1 = Word Match
+		//	2 = * Match
+		const unsigned short CheckWords(const std::string& InputWord, const std::string& PatternWord) const
+		{
+			if (PatternWord == "*") {
+				return 2;
+			}
+			else if (	equal(InputWord.begin(), InputWord.end(),
+						PatternWord.begin(), PatternWord.end(),
+						[](char Input, char Pattern) {
+							return tolower(Input) == tolower(Pattern);
+						})	) {	return 1; }
+			return 0;
+		}
+
+		std::string InputText(std::string InText) {
+			std::vector<Category*> Matches;
+
+			auto InWords = split(InText);
+			auto InSize = InWords.size();
+
+			for (auto Cat : Category_List) {
+				std::cout << std::endl;
+				auto PatWords = split(Cat.Pattern);
+				auto PatSize = PatWords.size();
+				auto iPWord = 0;
+				auto iWord = 0;
+
+				bool bMatch = true;
+				while (bMatch) {
+					switch (CheckWords(InWords[iWord], PatWords[iPWord]))
+					{
+					case 0:	//	No Match
+					{
+						bMatch = false;
+						std::cout << "No Match\n";
+					}
+					break;
+
+					case 1:	//	Word Match
+					{
+						std::cout << "WORD Match\n";
+						iPWord++;
+						iWord++;
+						auto PatternEnd = (iPWord >= PatSize);
+						auto InputEnd = (iWord >= InSize);
+						if (PatternEnd) {
+							if (InputEnd) {
+								//	Pattern END
+								//	Input	END
+								//	-- Complete match
+								bMatch = false;
+								std::cout << "\tEnd Pattern & Input\n";
+							}
+							else {
+								//	Pattern END
+								//	Input	Remaining
+								//	-- Partial Input Match
+								bMatch = false;
+								std::cout << "\tEnd Pattern\n";
+							}
+						}
+						else if (InputEnd) {
+							//	Pattern Remaining
+							//	Input	END
+							//	-- Partial pattern match (no match)
+							bMatch = false;
+							std::cout << "\tEnd Input\n";
+						}
+					}
+					break;
+
+					case 2:	//	* Match
+					{
+						std::cout << "* Match\n";
+						iPWord++;
+						iWord++;
+						auto PatternEnd = (iPWord >= PatSize);
+						auto InputEnd = (iWord >= InSize);
+
+						if (PatternEnd) {
+							if (InputEnd) {
+								//	Pattern END
+								//	Input	END
+								//	-- Complete match
+								bMatch = false;
+								std::cout << "\tEnd Pattern & Input\n";
+							}
+							else {
+								//	Pattern END *
+								//	Continue processing input
+								iPWord--;
+							}
+						}
+						else if (InputEnd) {
+							//	Pattern Remaining
+							//	Input	END
+							//	-- Partial pattern match (no match)
+							bMatch = false;
+							std::cout << "\tEnd Input\n";
+						}
+					}
+					break;
+
+					default: std::cout << "Pattern Matching Error" << std::endl; break;
+					}
+				}
+			}
+			return std::string("placeholder");
+		}
 	};
 }
 
 int main()
 {
 	AIML::Bot MyBot;
-	std::system("PAUSE");
-	MyBot.DebugCategories();
-	std::system("PAUSE");
+	//std::system("PAUSE");
+	//MyBot.DebugCategories();
+	//std::system("PAUSE");
 	/*MyBot.DebugStars1();
 	MyBot.DebugCategories();
 	std::system("PAUSE");
 	MyBot.DebugStars2();
 	MyBot.DebugCategories();
 	std::system("PAUSE");*/
-    //std::cout << "Hello World!\n"; 
+
+	bool ExitProgram = false;
+	std::string InputText;
+	char c;
+
+	while (!ExitProgram) {
+		InputText = "";
+		while (std::cin.get(c) && c != '\n') {
+			InputText += c;
+		}
+		if (InputText == "quit" || InputText == "exit") {
+			ExitProgram = true;
+		}
+		else {
+			std::string Output = MyBot.InputText(InputText);
+			std::cout << "BOT: " << Output.c_str() << std::endl;
+		}
+	}
+	std::system("PAUSE");
 }
 
 // Run program: Ctrl + F5 or Debug > Start Without Debugging menu
