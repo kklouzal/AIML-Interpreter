@@ -12,7 +12,7 @@
 			<template>
 				<random>
 					<li>That seems like a long time.</li>
-					<li>Only four <star/>?</li>
+					<li>Only four <star/> ? </li>
 				</random>
 			</template>
 		</category>
@@ -52,4 +52,16 @@
 			<srai>WHO IS <star/></srai>
 		</template>
 	</category>
+	<category>
+		<pattern>I am *</pattern>
+		<template>
+			Hello <set name = "username"><star/></set>!
+		</template>  
+	</category>
+	<category>
+		<pattern>Good Night</pattern>
+		<template>
+			Goodbye <get name = "username"/> see you later!
+		</template>  
+	</category>  
 </aiml>

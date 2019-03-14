@@ -6,6 +6,7 @@
 #include <vector>
 #include <list>
 #include <array>
+#include <unordered_map>
 #include <filesystem>
 #include <functional>
 #include <iostream>
@@ -68,6 +69,7 @@ namespace AIML
 	public:
 		std::string Topic;	// Current topic
 		std::string That;	// Current context
+		std::unordered_map<std::string, std::string> Variables;	// Current stored variables
 		std::array<std::string, 8> Stars; // Current <star/> inputs
 		std::vector<Category> Category_List;
 
@@ -77,7 +79,7 @@ namespace AIML
 			}
 		}
 
-		void DebugStars() {
+		void DebugStars1() {
 			Stars[0] = "Quick";
 			Stars[1] = "Brown";
 			Stars[2] = "Fox";
@@ -86,9 +88,66 @@ namespace AIML
 			Stars[5] = "The";
 			Stars[6] = "Lazy";
 			Stars[7] = "Dog";
-
+		}
+		void DebugStars2() {
+			Stars[0] = "Pack";
+			Stars[1] = "My";
+			Stars[2] = "Box";
+			Stars[3] = "With";
+			Stars[4] = "Five";
+			Stars[5] = "Dozen";
+			Stars[6] = "Big";
+			Stars[7] = "Jugs";
 		}
 
+		/*void walk(const rapidxml::xml_node<>* node, int indent = 0) {
+			const auto ind = std::string(indent * 4, ' ');
+			printf("%s", ind.c_str());
+
+			const rapidxml::node_type t = node->type();
+			switch (t) {
+			case rapidxml::node_element:
+			{
+				printf("<%.*s", node->name_size(), node->name());
+				for (const rapidxml::xml_attribute<>* a = node->first_attribute()
+					; a
+					; a = a->next_attribute()
+					) {
+					printf(" %.*s", a->name_size(), a->name());
+					printf("='%.*s'", a->value_size(), a->value());
+				}
+				printf(">\n");
+				printf("%s", ind.c_str());
+				printf("DATA:[%.*s]\n", node->value_size(), node->value());
+
+				for (const rapidxml::xml_node<>* n = node->first_node()
+					; n
+					; n = n->next_sibling()
+					) {
+					walk(n, indent + 1);
+				}
+				printf("%s</%.*s>\n", ind.c_str(), node->name_size(), node->name());
+			}
+			break;
+
+			case rapidxml::node_data:
+				printf("DATA:[%.*s]\n", node->value_size(), node->value());
+				break;
+
+			default:
+				printf("NODE-TYPE:%d\n", t);
+				break;
+			}
+		}*/
+
+		/*void TryWritePiece(std::string *Value){
+			if (Category_List.back().Templates.empty()) {
+				Category_List.back().Templates.emplace_back(std::list<std::string*>(1, Value));
+			}
+			else {
+				Category_List.back().Templates.back().emplace_back(Value);
+			}
+		}*/
 		//	Recursively walk through a TEMPLATE constructing response templates for an AIML::Category
 		void WalkTemplate(const rapidxml::xml_node<>* node) {
 
@@ -101,27 +160,49 @@ namespace AIML
 					//	Set flag for use of random responses?
 					//	This could eliminate the use of double nested arrays
 					//		for single response patterns.
+					//std::cout << "<random> " << node->value() << std::endl;
 				}
 				//	Encountered <li>
 				else if (strcmp(node->name(), "li") == 0) {
 					//	Create a new Response List at the back of Templates
 					Category_List.back().Templates.emplace_back(std::list<std::string*>());
+					//TryWritePiece(new std::string(node->value()));
+					//std::cout << "<li> " << node->value() << std::endl;
 				}
 				//	Encountered <srai>
 				else if (strcmp(node->name(), "srai") == 0) {
 					//	Enable this category to use symbolic reduction (sari)
 					Category_List.back().SetSRAI();
+					//std::cout << "<srai> " << node->value() << std::endl;
 				}
 				else if (strcmp(node->name(), "star") == 0) {
 					//	Insert reference to appropriate <star/> value
 					Category_List.back().Templates.back().push_back(&Stars[0]);
+					//TryWritePiece(&Stars[0]);
+					//std::cout << "<star> " << node->value() << std::endl;
+				}
+				else if (strcmp(node->name(), "get") == 0) {
+					//	Insert reference to appropriate <get name='...'/> value
+					//auto VariableName = node->first_attribute("name");
+					//std::cout << "Variable Name: " << VariableName->value() << std::endl;
+					//Category_List.back().Templates.back().push_back(&Stars[0]);
+					//std::cout << "<get> " << node->value() << std::endl;
+				}
+				else if (strcmp(node->name(), "set") == 0) {
+					//	Update value to appropriate <set name='...'>...</set> value
+					//auto VariableName = node->first_attribute("name");
+					//std::cout << "Variable Name: " << VariableName->value() << std::endl;
+					//std::cout << "Variable Value: " << node->value() << std::endl;
+					//Category_List.back().Templates.back().push_back(&Stars[0]);
+					//std::cout << "<set> " << node->value() << std::endl;
 				}
 				else {
-					printf("<%s>\n", node->name());
-				}
-				for (auto a = node->first_attribute(); a; a = a->next_attribute()) {
-					printf(" %s", a->name());
-					printf("='%s'", a->value());
+					printf("<%s> %s\n", node->name(), node->value());
+					for (auto a = node->first_attribute(); a; a = a->next_attribute()) {
+						printf("<set/get %s", a->name());
+						printf("='%s'", a->value());
+						printf(">\n");
+					}
 				}
 
 				for (auto n = node->first_node(); n; n = n->next_sibling()) {
@@ -199,7 +280,7 @@ namespace AIML
 						Documents.emplace();
 						try {
 							//	Parse the raw XML data into an XML Document object
-							Documents.back().parse<0 | rapidxml::parse_normalize_whitespace>(XML.back().data());
+							Documents.back().parse<rapidxml::parse_default | rapidxml::parse_normalize_whitespace>(XML.back().data());
 							//	Iterate through the XML extracting C++ objects from the AIML
 							rapidxml::xml_node<>* Root_Node = Documents.back().first_node("aiml");
 							for (rapidxml::xml_node<>* Topic_Node = Root_Node->first_node("topic"); Topic_Node; Topic_Node = Topic_Node->next_sibling())
@@ -240,9 +321,12 @@ int main()
 	std::system("PAUSE");
 	MyBot.DebugCategories();
 	std::system("PAUSE");
-	MyBot.DebugStars();
+	/*MyBot.DebugStars1();
 	MyBot.DebugCategories();
 	std::system("PAUSE");
+	MyBot.DebugStars2();
+	MyBot.DebugCategories();
+	std::system("PAUSE");*/
     //std::cout << "Hello World!\n"; 
 }
 
