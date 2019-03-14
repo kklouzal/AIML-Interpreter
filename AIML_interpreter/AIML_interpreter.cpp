@@ -18,9 +18,9 @@ namespace AIML
 {
 	namespace fs = std::experimental::filesystem;
 
-	std::vector<std::string> split(const std::string& s, char delimiter=' ')
+	std::list<std::string> split(const std::string& s, char delimiter=' ')
 	{
-		std::vector<std::string> tokens;
+		std::list<std::string> tokens;
 		std::string token;
 		std::istringstream tokenStream(s);
 		while (std::getline(tokenStream, token, delimiter))
@@ -33,14 +33,26 @@ namespace AIML
 	class Category
 	{
 	public:
-		std::string Pattern;	// Input pattern
+		//std::string Pattern;	// Input pattern
+		std::list<std::string> Pattern;	// Input pattern tokenized into individual words
 		std::string Topic;		// Topic of this category
 		std::string That;		// Context limiter for this category
 		bool Srai;				// Rematch using this pattern
 		std::vector<std::list<std::string*>> Templates;	// Response templates
 		//	unordered_map 'SetList' string/string - Values to be set during template call
 
-		Category(std::string UsePattern, std::string UseTopic) : Pattern(UsePattern), Topic(UseTopic), Srai(false) {}
+		//	Capitalize every letter in the input patter and tokenize it into individual words.
+		Category(std::string UsePattern, std::string UseTopic) : Topic(UseTopic), Srai(false) {
+			for (auto& x : UsePattern) {
+				x = toupper(x);
+			}
+			std::string token;
+			std::istringstream tokenStream(UsePattern);
+			while (std::getline(tokenStream, token, ' '))
+			{
+				Pattern.push_back(token);
+			}
+		}
 
 		~Category() {
 			for (auto Template : Templates) {
@@ -53,7 +65,11 @@ namespace AIML
 		//	So we can visually debug the state of our memory
 		void PrintData() {
 			std::cout << std::endl << "Category Data" << std::endl;
-			std::cout << "\tPattern: " << Pattern << std::endl;
+			std::cout << "\tPattern:";
+			for (auto Token : Pattern) {
+				std::cout << " " << Token;
+			}
+			std::cout << std::endl;
 			std::cout << "\tTopic: " << Topic << std::endl;
 			std::cout << "\tThat: " << That << std::endl;
 			std::cout << "\tSrai: " << Srai << std::endl;
@@ -256,19 +272,34 @@ namespace AIML
 			}
 		}
 
-		//	0 = No Match
-		//	1 = Word Match
-		//	2 = * Match
-		const unsigned short CheckWords(const std::string& InputWord, const std::string& PatternWord) const
+		//	0 = No Match			[ WORD != WORD ]
+		//	1 = Direct Word Match	[ WORD == WORD ]
+		//	2 = Direct * Match		[ WORD -> * ]
+		//	3 = Previous * Match	[ WORD -> (*<-WORD) ]
+		//
+		//	PatternWord must be supplied in all caps.
+		//	Do not check Previous * Match when bFirst is true.
+		const unsigned short CheckWords(const std::string& InputWord, std::list<std::string>::const_iterator& PatternWord, const bool bFirst) const
 		{
-			if (PatternWord == "*") {
+			//	Debug: print *PatternWord to ensure we've not jacked the sequence up and are going in order.
+			//std::cout << "\t\t CheckWords-> " << *PatternWord << std::endl;
+			if (*PatternWord == "*") {
 				return 2;
 			}
 			else if (	equal(InputWord.begin(), InputWord.end(),
-						PatternWord.begin(), PatternWord.end(),
+						(*PatternWord).begin(), (*PatternWord).end(),
 						[](char Input, char Pattern) {
-							return tolower(Input) == tolower(Pattern);
-						})	) {	return 1; }
+							return toupper(Input) == Pattern;
+				})) {
+				return 1;
+			}
+			else if (!bFirst && *--PatternWord == "*") {
+				// Don't worry about incrementing the iterator back to where it was?
+				// Chances are the next 'InputWord' being checked will be of type 3.
+				// If the pattern match fails at this point we'll scrap this category anyways.
+				//	--I think all that's correct ?:D
+				return 3;
+			}
 			return 0;
 		}
 
@@ -276,87 +307,107 @@ namespace AIML
 			std::vector<Category*> Matches;
 
 			auto InWords = split(InText);
-			auto InSize = InWords.size();
 
 			for (auto Cat : Category_List) {
-				std::cout << std::endl;
-				auto PatWords = split(Cat.Pattern);
-				auto PatSize = PatWords.size();
-				auto iPWord = 0;
-				auto iWord = 0;
+				auto PatWords = Cat.Pattern;
 
-				bool bMatch = true;
-				while (bMatch) {
-					switch (CheckWords(InWords[iWord], PatWords[iPWord]))
-					{
-					case 0:	//	No Match
-					{
-						bMatch = false;
-						std::cout << "No Match\n";
-					}
-					break;
+				auto PatIter = PatWords.cbegin();
+				auto InIter = InWords.cbegin();
 
-					case 1:	//	Word Match
+				bool bTryCategory = true;
+				while (bTryCategory) {
+					switch (CheckWords(*InIter, PatIter, (PatIter == PatWords.cbegin())))
 					{
-						std::cout << "WORD Match\n";
-						iPWord++;
-						iWord++;
-						auto PatternEnd = (iPWord >= PatSize);
-						auto InputEnd = (iWord >= InSize);
+					case 0: bTryCategory = false; break;	//	Halt; No Match
+
+					case 1:	//	Direct Word Match
+					{
+						std::cout << *InIter << "\tWORD Match\n";
+						auto PatternEnd = (++PatIter == PatWords.cend());
+						auto InputEnd = (++InIter == InWords.cend());
 						if (PatternEnd) {
 							if (InputEnd) {
 								//	Pattern END
 								//	Input	END
 								//	-- Complete match
-								bMatch = false;
-								std::cout << "\tEnd Pattern & Input\n";
+								bTryCategory = false;
+								//std::cout << "\tEnd Pattern & Input\n";
 							}
 							else {
 								//	Pattern END
 								//	Input	Remaining
 								//	-- Partial Input Match
-								bMatch = false;
-								std::cout << "\tEnd Pattern\n";
+								bTryCategory = false;
+								//std::cout << "\tEnd Pattern\n";
 							}
 						}
 						else if (InputEnd) {
 							//	Pattern Remaining
 							//	Input	END
 							//	-- Partial pattern match (no match)
-							bMatch = false;
-							std::cout << "\tEnd Input\n";
+							bTryCategory = false;
+							//std::cout << "\tEnd Input\n";
 						}
 					}
 					break;
 
-					case 2:	//	* Match
+					case 2:	//	Direct * Match
 					{
-						std::cout << "* Match\n";
-						iPWord++;
-						iWord++;
-						auto PatternEnd = (iPWord >= PatSize);
-						auto InputEnd = (iWord >= InSize);
+						std::cout << *InIter << "\t* Match\n";
+						auto PatternEnd = (++PatIter == PatWords.cend());
+						auto InputEnd = (++InIter == InWords.cend());
 
 						if (PatternEnd) {
 							if (InputEnd) {
 								//	Pattern END
 								//	Input	END
 								//	-- Complete match
-								bMatch = false;
-								std::cout << "\tEnd Pattern & Input\n";
+								bTryCategory = false;
+								//std::cout << "\tEnd Pattern & Input\n";
 							}
 							else {
 								//	Pattern END *
 								//	Continue processing input
-								iPWord--;
+								PatIter--;
 							}
 						}
 						else if (InputEnd) {
 							//	Pattern Remaining
 							//	Input	END
 							//	-- Partial pattern match (no match)
-							bMatch = false;
-							std::cout << "\tEnd Input\n";
+							bTryCategory = false;
+							//std::cout << "\tEnd Input\n";
+						}
+					}
+					break;
+
+					case 3:	//	Previous * Match
+					{
+						std::cout << *InIter << "\tPrevious * Match\n";
+						auto PatternEnd = (++PatIter == PatWords.cend());
+						auto InputEnd = (++InIter == InWords.cend());
+
+						if (PatternEnd) {
+							if (InputEnd) {
+								//	Pattern END
+								//	Input	END
+								//	-- Complete match
+								bTryCategory = false;
+								//std::cout << "\tEnd Pattern & Input\n";
+							}
+							else {
+								//	Pattern END *
+								//	Continue processing input
+								//	Already decremented in CheckWords()
+								//PatIter--;
+							}
+						}
+						else if (InputEnd) {
+							//	Pattern Remaining
+							//	Input	END
+							//	-- Partial pattern match (no match)
+							bTryCategory = false;
+							//std::cout << "\tEnd Input\n";
 						}
 					}
 					break;
@@ -364,6 +415,7 @@ namespace AIML
 					default: std::cout << "Pattern Matching Error" << std::endl; break;
 					}
 				}
+				//do stuff
 			}
 			return std::string("placeholder");
 		}

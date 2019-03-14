@@ -63,5 +63,11 @@
 		<template>
 			Goodbye <get name = "username"/> see you later!
 		</template>  
-	</category>  
+	</category>
+	<category>
+		<pattern>DO YOU KNOW * TO *</pattern>
+		<template>
+			Do you know <star/> to <star/>?
+		</template>
+	</category>
 </aiml>
