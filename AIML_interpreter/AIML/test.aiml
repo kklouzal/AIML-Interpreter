@@ -1,73 +1,50 @@
 <aiml>
-	<topic name="TIME">
-		<category>
-			<pattern>HOW MUCH TIME *</pattern>
-			<template>
-				How much?
-			</template>
-		</category>
-		<category>
-			<pattern>4 *</pattern>
-			<that>HOW MUCH TIME *</that>
-			<template>
-				<random>
-					<li>That seems like a long time.</li>
-					<li>Only four <star/> ? </li>
-				</random>
-			</template>
-		</category>
-		<category>
-			<pattern>FOUR *</pattern>
-			<that>HOW MUCH TIME *</that>
-			<template>
-				<srai>4 <star/></srai>
-			</template>
-		</category>
-		<category>
-			<pattern>*</pattern>
-			<template> 
-				<think><set name="topic">Time</set></think>
-			</template>
-		</category>
-	</topic>
 	<category>
-		<pattern>HELLO</pattern>
+		<pattern>TEST $PRIORITY</pattern>
 		<template>
-			<random>
-				<li>Hey!</li>
-				<li>Hello.</li>
-				<li>Hi. How are you?</li>
-			</random>
+			Priority Response
 		</template>
 	</category>
 	<category>
-		<pattern>HI</pattern>
+		<pattern>TEST PRIORITY ZERO #</pattern>
 		<template>
-			<srai>HELLO</srai>
+			0 or more response
 		</template>
 	</category>
 	<category>
-		<pattern>DO YOU KNOW WHO * IS</pattern>
+		<pattern>TEST PRIORITY _</pattern>
 		<template>
-			<srai>WHO IS <star/></srai>
+			1 or more response
 		</template>
 	</category>
 	<category>
-		<pattern>I am *</pattern>
+		<pattern>TEST WORD MATCH</pattern>
 		<template>
-			Hello <set name = "username"><star/></set>!
-		</template>  
+			word match response
+		</template>
 	</category>
 	<category>
-		<pattern>Good Night</pattern>
+		<pattern>TEST ^ ZERO</pattern>
 		<template>
-			Goodbye <get name = "username"/> see you later!
-		</template>  
+			0 match response
+		</template>
 	</category>
 	<category>
-		<pattern>DO YOU KNOW * TO *</pattern>
+		<pattern>TEST *</pattern>
 		<template>
-			Do you know <star/> to <star/>?
+			1 match response
+		</template>
+	</category>
+	<category>
+		<pattern>DO YOU KNOW THE _ TO $SAN $JOSE</pattern>
+		<template>
+			Do you know the way to san jose?
+		</template>
+	</category>
+	<category>
+		<pattern>DO YOU KNOW WHAT THE ROCK IS COOKING</pattern>
+		<template>
+			It's 'Do you SMELL what the rock is cooking'.
 		</template>
 	</category>
 </aiml>

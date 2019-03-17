@@ -14,6 +14,8 @@
 #include "rapidxml.hpp"
 #include "rapidxml_utils.hpp"
 
+#include "graphmaster.hpp"
+
 namespace AIML
 {
 	namespace fs = std::experimental::filesystem;
@@ -94,6 +96,7 @@ namespace AIML
 	{
 		std::queue<rapidxml::file<>> XML;
 		std::queue<rapidxml::xml_document<>> Documents;
+		GraphMaster PatternGraph;
 	public:
 		std::string Topic;	// Current topic
 		std::string That;	// Current context
@@ -200,8 +203,10 @@ namespace AIML
 					continue;
 				}
 				std::string Pattern = Pattern_Node->value();
+				//	GRAPHMASTER
+				PatternGraph.AddPattern(Pattern);
 				//	Dissect TEMPLATE
-				auto Template_Node = Category_Node->first_node("template");
+				/*auto Template_Node = Category_Node->first_node("template");
 				if (Template_Node == NULL) {
 					std::cout << "Skipping Malformed Category: No TEMPLATE" << std::endl;
 					continue;
@@ -216,7 +221,7 @@ namespace AIML
 				if (That_Node != NULL) {
 					std::string That = That_Node->value();
 					Category_List.back().SetThat(That);
-				}
+				}*/
 			}
 		}
 
@@ -261,6 +266,7 @@ namespace AIML
 					}
 				}
 			}
+			PatternGraph.PrintDebug();
 		}
 
 		~Bot() {
@@ -270,6 +276,10 @@ namespace AIML
 			while (!XML.empty()) {
 				XML.pop();
 			}
+		}
+
+		void InputText2(std::string InText) {
+			PatternGraph.MatchPattern(InText);
 		}
 
 		std::string InputText(std::string InText) {
@@ -380,8 +390,9 @@ int main()
 			ExitProgram = true;
 		}
 		else {
-			std::string Output = MyBot.InputText(InputText);
-			std::cout << "BOT: " << Output.c_str() << std::endl;
+			//std::string Output = MyBot.InputText(InputText);
+			MyBot.InputText2(InputText);
+			//std::cout << "BOT: " << Output.c_str() << std::endl;
 		}
 	}
 	std::system("PAUSE");
