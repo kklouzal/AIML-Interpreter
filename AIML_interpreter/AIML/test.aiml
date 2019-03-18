@@ -42,15 +42,19 @@
 		</template>
 	</category>
 	<category>
-		<pattern>TEST *</pattern>
+		<pattern>TEST * * *</pattern>
 		<template>
-			1 match response
+			1 match response <star/> <star/> <star/>
 		</template>
 	</category>
 	<category>
 		<pattern>DO YOU KNOW THE _ TO $SAN $JOSE</pattern>
 		<template>
-			Do you know the way to san jose?
+			<random>
+				<li>Do you know the <star/> to san jose?</li>
+				<li>Of course I know the <star/> to san jose!</li>
+				<li>Are you stupid? I know the <star/> to everything!</li>
+			</random>
 		</template>
 	</category>
 	<category>

@@ -26,10 +26,13 @@
     <ClInclude Include="rapidxml_utils.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Interpreter.hpp">
+    <ClInclude Include="graphmaster.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="graphmaster.hpp">
+    <ClInclude Include="category.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="bot.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

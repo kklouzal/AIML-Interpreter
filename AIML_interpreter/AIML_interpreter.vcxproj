@@ -154,8 +154,9 @@
     <ClCompile Include="AIML_interpreter.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="bot.hpp" />
+    <ClInclude Include="category.hpp" />
     <ClInclude Include="graphmaster.hpp" />
-    <ClInclude Include="Interpreter.hpp" />
     <ClInclude Include="rapidxml.hpp" />
     <ClInclude Include="rapidxml_utils.hpp" />
   </ItemGroup>
