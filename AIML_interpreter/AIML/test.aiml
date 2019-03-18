@@ -30,6 +30,18 @@
 		</template>
 	</category>
 	<category>
+		<pattern>TEST ^ ZERO WORD</pattern>
+		<template>
+			0 match response
+		</template>
+	</category>
+	<category>
+		<pattern>TEST ZERO WORD</pattern>
+		<template>
+			0 match response
+		</template>
+	</category>
+	<category>
 		<pattern>TEST *</pattern>
 		<template>
 			1 match response

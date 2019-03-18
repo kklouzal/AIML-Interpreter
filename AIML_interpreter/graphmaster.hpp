@@ -61,6 +61,20 @@ namespace AIML
 		//	Traverse the graph searching for a pattern
 		const bool FindTokens(list<string>::iterator Tokens, list<string>::iterator End) {
 			if (Tokens == End) {
+				//	#	0 or more
+				auto Branch = Branches.find("#");
+				if (Branch != Branches.end()) {
+					std::cout << "TRAILING--> #" << std::endl;
+					//	Don't increment 'Tokens' on a 0+ wildcard
+					if (Branch->second.FindTokens(Tokens, End)) { return true; }
+				}
+				//	^ 0 or more
+				Branch = Branches.find("^");
+				if (Branch != Branches.end()) {
+					std::cout << "TRAILING--> ^" << std::endl;
+					//	Don't increment 'Tokens' on a 0+ wildcard
+					if (Branch->second.FindTokens(Tokens, End)) { return true; }
+				}
 				if (EndPoint) {
 					//	Return <template> from this node
 					std::cout << "PATTERN MATCH" << std::endl;
@@ -76,72 +90,69 @@ namespace AIML
 				auto Branch = Branches.find("$" + *Tokens);
 				if (Branch != Branches.end()) {
 					std::cout << "[" << *Tokens << "]--> $" << std::endl;
-					if (Branch->second.FindTokens(++Tokens, End)) {
-						return true;
-					}
+					if (Branch->second.FindTokens(++Tokens, End)) {	return true; }
 					else { --Tokens; }
 				}
-				//else {
 				//	#	0 or more
 				Branch = Branches.find("#");
 				if (Branch != Branches.end()) {
 					std::cout << "[" << *Tokens << "]--> #" << std::endl;
-					//	Don't increment 'Tokens' on a 0+ wildcard
-					if (Branch->second.FindTokens(Tokens, End)) {
-						return true;
-					}
+					//	Treat 0+ wildcards as if they match 0 words by not incrementing 'Tokens'
+					if (Branch->second.FindTokens(Tokens, End)) { return true; }
 				}
-				//else {
 				//	_ 	1 or more
 				Branch = Branches.find("_");
 				if (Branch != Branches.end()) {
 					std::cout << "[" << *Tokens << "]--> _" << std::endl;
-					if (Branch->second.FindTokens(++Tokens, End)) {
-						return true;
-					}
+					if (Branch->second.FindTokens(++Tokens, End)) {	return true; }
 					else { --Tokens; }
 				}
-				//else {
 				//	word
 				Branch = Branches.find(*Tokens);
 				if (Branch != Branches.end()) {
 					std::cout << "[" << *Tokens << "]--> WORD" << std::endl;
-					if (Branch->second.FindTokens(++Tokens, End)) {
-						return true;
-					}
+					if (Branch->second.FindTokens(++Tokens, End)) {	return true; }
 					else { --Tokens; }
 				}
-				//else {
 				//	^ 0 or more
 				Branch = Branches.find("^");
 				if (Branch != Branches.end()) {
 					std::cout << "[" << *Tokens << "]--> ^" << std::endl;
-					//	Don't increment 'Tokens' on a 0+ wildcard
-					if (Branch->second.FindTokens(Tokens, End)) {
-						return true;
-					}
+					//	Treat 0+ wildcards as if they match 0 words by not incrementing 'Tokens'
+					if (Branch->second.FindTokens(Tokens, End)) { return true; }
 				}
-				//else {
 				//	* 1 or more
 				Branch = Branches.find("*");
 				if (Branch != Branches.end()) {
 					std::cout << "[" << *Tokens << "]--> *" << std::endl;
-					if (Branch->second.FindTokens(++Tokens, End)) {
-						return true;
-					}
+					if (Branch->second.FindTokens(++Tokens, End)) {	return true; }
 					else { --Tokens; }
 				}
-				//else {
-				//	UNABLE TO MATCH PATTERN?!
-				if (_NodeType == NodeType::PZero || _NodeType == NodeType::POne || _NodeType == NodeType::Zero || _NodeType == NodeType::One) {
-					//	Increment our 'Tokens' and rematch this node
-					std::cout << "[" << *Tokens << "]--> REMATCH(" << _NodeType << ") " << std::endl;
-					if (FindTokens(++Tokens, End)) {
-						return true;
-					}
+				//	No direct node match; Rematch current node if wildcard
+				if (_NodeType == NodeType::PZero) {
+					//	Increment 'Tokens' and rematch this node
+					std::cout << "(" << *Tokens << ") # +" << std::endl;
+					if (FindTokens(++Tokens, End)) { return true; }
 					else { --Tokens; }
 				}
-				//else {
+				else if (_NodeType == NodeType::POne) {
+					//	Increment 'Tokens' and rematch this node
+					std::cout << "(" << *Tokens << ") _ +" << std::endl;
+					if (FindTokens(++Tokens, End)) { return true; }
+					else { --Tokens; }
+				}
+				else if (_NodeType == NodeType::Zero) {
+					//	Increment 'Tokens' and rematch this node
+					std::cout << "(" << *Tokens << ") ^ +" << std::endl;
+					if (FindTokens(++Tokens, End)) { return true; }
+					else { --Tokens; }
+				}
+				else if (_NodeType == NodeType::One) {
+					//	Increment 'Tokens' and rematch this node
+					std::cout << "(" << *Tokens << ") * +" << std::endl;
+					if (FindTokens(++Tokens, End)) { return true; }
+					else { --Tokens; }
+				}
 				if (_Parent) {
 					std::cout << "<--[" << *Tokens << "] NODE DEPLEATED" << std::endl;
 				}
@@ -149,13 +160,6 @@ namespace AIML
 					std::cout << "[" << *Tokens << "] NO MATCH AVAILABLE" << std::endl;
 				}
 				return false;
-				//}
-				//}
-				//}
-				//}
-				//}
-				//}
-				//}
 			}
 		}
 
