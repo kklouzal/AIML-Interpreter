@@ -1,5 +1,7 @@
 #pragma once
 
+#include <random>
+
 namespace AIML
 {
 	class TemplateWord {
@@ -10,6 +12,14 @@ namespace AIML
 
 		TemplateWord(std::array<std::string*, 8>** Stars, const unsigned int StarIndex) : _Stars(Stars), _StarIndex(StarIndex), _Word(nullptr) {}
 		TemplateWord(std::array<std::string*, 8>** Stars, const char* Word) : _Stars(Stars), _StarIndex(0), _Word(Word) {}
+
+		operator const char*() const
+		{
+			if (!_Word) {
+				return (**_Stars)[_StarIndex]->c_str();
+			}
+			return _Word;
+		}
 
 		friend std::ostream& operator<< (std::ostream& out, const TemplateWord& TWord)
 		{
@@ -25,6 +35,8 @@ namespace AIML
 
 	class Category
 	{
+		//std::default_random_engine RNG;								// Random numbers
+		//std::uniform_int_distribution<int> TNum;				// Returns a random template index
 		std::unordered_map<std::string, std::string*>** _Variables;	// Current stored variables
 		std::array<std::string*, 8>** _Stars;						// Current <star/> inputs
 		bool Srai;													// Rematch using this pattern
@@ -112,10 +124,11 @@ namespace AIML
 
 		//	Capitalize every letter in the input patter and tokenize it into individual words.
 		Category(const rapidxml::xml_node<>* node, std::unordered_map<std::string, std::string*>** DefaultVariables, std::array<std::string*, 8>** DefaultStars)
-			: _Variables(DefaultVariables), _Stars(DefaultStars), Srai(false) {
+			: _Variables(DefaultVariables), _Stars(DefaultStars), Srai(false)/*, RNG()*/ {
 			for (auto Node = node->first_node(); Node; Node = Node->next_sibling()) {
 				WalkTemplate(Node);
 			}
+			//TNum = std::uniform_int_distribution<int>(1, (int)Templates.size());
 		}
 
 		//	So we can visually debug the state of our memory
@@ -135,6 +148,34 @@ namespace AIML
 					PieceNum++;
 				}
 			}
+		}
+
+		void SetPointers(std::unordered_map<std::string, std::string*>* Variables, std::array<std::string*, 8>* Stars) {
+			*_Variables = Variables;
+			*_Stars = Stars;
+		}
+
+		operator std::string() const
+		{
+			const unsigned int TemplateCount = Templates.size();
+			const unsigned int TemplateNum = 1 + rand() % TemplateCount;
+
+			std::string Output;
+			for (auto Str : Templates[TemplateNum - 1]) {
+				Output += Str;
+			}
+			return Output;
+		}
+
+		friend std::ostream& operator<< (std::ostream& out, const Category& TCat)
+		{
+			const unsigned int TemplateCount = TCat.Templates.size();
+			const unsigned int TemplateNum = 1 + rand() % TemplateCount;
+
+			for (auto Str : TCat.Templates[TemplateNum - 1]) {
+				out << Str << " ";
+			}
+			return out;
 		}
 	};
 }

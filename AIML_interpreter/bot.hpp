@@ -1,9 +1,10 @@
 #pragma once
 
+#include "graphmaster.hpp"
+
 namespace AIML
 {
 	using std::string;
-	class GraphMaster;
 	class Bot
 	{
 		GraphMaster* _GM;
@@ -34,6 +35,15 @@ namespace AIML
 			for (auto Obj : Stars) {
 				delete Obj;
 			}
+		}
+
+		std::string InputText(std::string StrInput) {
+			auto Result = _GM->MatchPattern(StrInput, GetVars(), GetStars());
+			if (Result != nullptr) {
+				Result->SetPointers(GetVars(), GetStars());
+				return *Result;
+			}
+			return "No Response Found..";
 		}
 
 		std::unordered_map<std::string, std::string*> * GetVars() { return &Variables; }

@@ -6,7 +6,6 @@
 #include <list>
 
 #include "category.hpp"
-#include "bot.hpp"
 
 namespace AIML
 {
@@ -32,18 +31,21 @@ namespace AIML
 	struct Node {
 		unordered_map<string, Node> Branches;
 		bool EndPoint;
+		Category* _Category;
 		Node* _Parent;
 		NodeType _NodeType;
 
-		Node(Node* Parent = nullptr, NodeType NType = NodeType::ROOT) : _Parent(Parent), EndPoint(false), _NodeType(NType) {}
+		Node(Node* Parent = nullptr, NodeType NType = NodeType::ROOT) : _Parent(Parent), EndPoint(false), _Category(nullptr), _NodeType(NType) {}
 		
 		//	Process a token, removing it from the queue before passing deeper
-		void ProcessTokens(queue<string> &Tokens) {
+		//	Returns the final node in the chain
+		Node* ProcessTokens(queue<string> &Tokens) {
 			if (Tokens.empty()) {
 				EndPoint = true;
 				//	End of tokens
 				//	Store <template> in this node
 				std::cout << "End Branch" << std::endl;
+				return this;
 			}
 			else {
 				auto Token = Tokens.front();
@@ -58,35 +60,37 @@ namespace AIML
 				}
 				std::cout << Token << "(" << NType << ")->";
 				Tokens.pop();
-				Branches.emplace(Token, Node(this, NType)).first->second.ProcessTokens(Tokens);
+				return Branches.emplace(Token, Node(this, NType)).first->second.ProcessTokens(Tokens);
 			}
 		}
 
 		//	Traverse the graph searching for a pattern
-		const bool FindTokens(list<string>::iterator Tokens, list<string>::iterator End) {
+		const bool FindTokens(list<string>::iterator Tokens, list<string>::iterator End, Category*& Result) {
 			if (Tokens == End) {
 				//	#	0 or more
 				auto Branch = Branches.find("#");
 				if (Branch != Branches.end()) {
 					std::cout << "TRAILING--> #" << std::endl;
 					//	Don't increment 'Tokens' on a 0+ wildcard
-					if (Branch->second.FindTokens(Tokens, End)) { return true; }
+					if (Branch->second.FindTokens(Tokens, End, Result)) { return true; }
 				}
 				//	^ 0 or more
 				Branch = Branches.find("^");
 				if (Branch != Branches.end()) {
 					std::cout << "TRAILING--> ^" << std::endl;
 					//	Don't increment 'Tokens' on a 0+ wildcard
-					if (Branch->second.FindTokens(Tokens, End)) { return true; }
+					if (Branch->second.FindTokens(Tokens, End, Result)) { return true; }
 				}
 				if (EndPoint) {
 					//	Return <template> from this node
 					std::cout << "PATTERN MATCH" << std::endl;
+					Result = _Category;
 					return true;
 				}
 				else {
 					//	Incomplete pattern
 					std::cout << "PATTERN INCOMPLETE" << std::endl;
+					Result = nullptr;
 					return false;
 				}
 			} else {
@@ -94,7 +98,7 @@ namespace AIML
 				auto Branch = Branches.find("$" + *Tokens);
 				if (Branch != Branches.end()) {
 					std::cout << "[" << *Tokens << "]--> $" << std::endl;
-					if (Branch->second.FindTokens(++Tokens, End)) {	return true; }
+					if (Branch->second.FindTokens(++Tokens, End, Result)) {	return true; }
 					else { --Tokens; }
 				}
 				//	#	0 or more
@@ -102,20 +106,20 @@ namespace AIML
 				if (Branch != Branches.end()) {
 					std::cout << "[" << *Tokens << "]--> #" << std::endl;
 					//	Treat 0+ wildcards as if they match 0 words by not incrementing 'Tokens'
-					if (Branch->second.FindTokens(Tokens, End)) { return true; }
+					if (Branch->second.FindTokens(Tokens, End, Result)) { return true; }
 				}
 				//	_ 	1 or more
 				Branch = Branches.find("_");
 				if (Branch != Branches.end()) {
 					std::cout << "[" << *Tokens << "]--> _" << std::endl;
-					if (Branch->second.FindTokens(++Tokens, End)) {	return true; }
+					if (Branch->second.FindTokens(++Tokens, End, Result)) {	return true; }
 					else { --Tokens; }
 				}
 				//	word
 				Branch = Branches.find(*Tokens);
 				if (Branch != Branches.end()) {
 					std::cout << "[" << *Tokens << "]--> WORD" << std::endl;
-					if (Branch->second.FindTokens(++Tokens, End)) {	return true; }
+					if (Branch->second.FindTokens(++Tokens, End, Result)) {	return true; }
 					else { --Tokens; }
 				}
 				//	^ 0 or more
@@ -123,38 +127,38 @@ namespace AIML
 				if (Branch != Branches.end()) {
 					std::cout << "[" << *Tokens << "]--> ^" << std::endl;
 					//	Treat 0+ wildcards as if they match 0 words by not incrementing 'Tokens'
-					if (Branch->second.FindTokens(Tokens, End)) { return true; }
+					if (Branch->second.FindTokens(Tokens, End, Result)) { return true; }
 				}
 				//	* 1 or more
 				Branch = Branches.find("*");
 				if (Branch != Branches.end()) {
 					std::cout << "[" << *Tokens << "]--> *" << std::endl;
-					if (Branch->second.FindTokens(++Tokens, End)) {	return true; }
+					if (Branch->second.FindTokens(++Tokens, End, Result)) {	return true; }
 					else { --Tokens; }
 				}
 				//	No direct node match; Rematch current node if wildcard
 				if (_NodeType == NodeType::PZero) {
 					//	Increment 'Tokens' and rematch this node
 					std::cout << "(" << *Tokens << ") # +" << std::endl;
-					if (FindTokens(++Tokens, End)) { return true; }
+					if (FindTokens(++Tokens, End, Result)) { return true; }
 					else { --Tokens; }
 				}
 				else if (_NodeType == NodeType::POne) {
 					//	Increment 'Tokens' and rematch this node
 					std::cout << "(" << *Tokens << ") _ +" << std::endl;
-					if (FindTokens(++Tokens, End)) { return true; }
+					if (FindTokens(++Tokens, End, Result)) { return true; }
 					else { --Tokens; }
 				}
 				else if (_NodeType == NodeType::Zero) {
 					//	Increment 'Tokens' and rematch this node
 					std::cout << "(" << *Tokens << ") ^ +" << std::endl;
-					if (FindTokens(++Tokens, End)) { return true; }
+					if (FindTokens(++Tokens, End, Result)) { return true; }
 					else { --Tokens; }
 				}
 				else if (_NodeType == NodeType::One) {
 					//	Increment 'Tokens' and rematch this node
 					std::cout << "(" << *Tokens << ") * +" << std::endl;
-					if (FindTokens(++Tokens, End)) { return true; }
+					if (FindTokens(++Tokens, End, Result)) { return true; }
 					else { --Tokens; }
 				}
 				if (_Parent) {
@@ -163,6 +167,7 @@ namespace AIML
 				else {
 					std::cout << "[" << *Tokens << "] NO MATCH AVAILABLE" << std::endl;
 				}
+				Result = nullptr;
 				return false;
 			}
 		}
@@ -193,7 +198,7 @@ namespace AIML
 
 		Node RootNode;						//	Root node for all pattern branches
 		unordered_set<string> Words;		//	Unique set of words across all branches
-		std::vector<Category> Categories;	//	All graphed categories (templates)
+		list<Category> Categories;			//	All graphed categories (templates)
 
 		//	Tokenize an input string
 		//	Tokens are converted to UPPER CASE
@@ -246,6 +251,7 @@ namespace AIML
 				}
 				//	Start constructing a new CATEGORY
 				Categories.push_back(Category(Template_Node, &_DefaultVariables, &_DefaultStars));
+				auto NewCategory = &Categories.back();
 
 				//	Dissect THAT
 				/*auto That_Node = Category_Node->first_node("that");
@@ -258,7 +264,8 @@ namespace AIML
 				//	Tokenize our input pattern
 				auto Tokens = TokenQueue(Pattern_Node->value());
 				//	Pass our tokens into the RootNode
-				RootNode.ProcessTokens(Tokens);
+				auto NewPattern = RootNode.ProcessTokens(Tokens);
+				NewPattern->_Category = NewCategory;
 			}
 		}
 
@@ -317,12 +324,15 @@ namespace AIML
 
 		//	Try to match a pattern from the graph
 		//	Uses a bots 'Variable' and 'Star' list
-		void MatchPattern(string Pattern, std::unordered_map<std::string, std::string*>* _Variables, std::array<std::string*, 8>* _Stars)
+		Category* MatchPattern(string Pattern, std::unordered_map<std::string, std::string*>* _Variables, std::array<std::string*, 8>* _Stars)
 		{
+			Category* Result = nullptr;
 			//	Tokenize our input pattern
 			auto Tokens = TokenList(Pattern);
 			//	Pass our tokens into the RootNode
-			RootNode.FindTokens(Tokens.begin(), Tokens.end());
+			RootNode.FindTokens(Tokens.begin(), Tokens.end(), Result);
+
+			return Result;
 		}
 		
 		void DebugCategories(std::unordered_map<std::string, std::string*> * _Variables, std::array<std::string*, 8> * _Stars) {
@@ -336,12 +346,5 @@ namespace AIML
 			std::cout << "Total Branches:\t" << RootNode.BranchCount() << std::endl;
 			std::cout << "Total Patterns:\t" << RootNode.PatternCount() << std::endl;
 		}
-
-		//	Creates a new AIML::Bot
-		//	Must be destroyed BEFORE the AIML::GraphMaster
-		Bot CreateBot() {
-			return Bot(this);
-		}
-
 	};
 }
