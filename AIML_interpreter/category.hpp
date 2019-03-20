@@ -46,28 +46,23 @@ namespace AIML
 		{
 			switch (_Type)
 			{
-
-			case TWT_Word:
-			{
+			case TWT_Word: {
 				return _Word;
 			}
 			break;
 
-			case TWT_Wildcard:
-			{
+			case TWT_Wildcard: {
 				return (**_Stars)[_StarIndex]->c_str();
 			}
 			break;
 
-			case TWT_SetClear:
-			{
+			case TWT_SetClear: {
 				(**_Variables)[_VariableIndex] = "";
 				return "";
 			}
 			break;
 
-			case TWT_SetWord:
-			{
+			case TWT_SetWord: {
 				(**_Variables)[_VariableIndex] += _Word;
 				if (_Thinking) {
 					return "";
@@ -78,8 +73,7 @@ namespace AIML
 			}
 			break;
 
-			case TWT_SetWildcard:
-			{
+			case TWT_SetWildcard: {
 				(**_Variables)[_VariableIndex] += *(**_Stars)[_StarIndex];
 				if (_Thinking) {
 					return "";
@@ -90,8 +84,7 @@ namespace AIML
 			}
 			break;
 
-			case TWT_Get:
-			{
+			case TWT_Get: {
 				return (**_Variables)[_VariableIndex].c_str();
 			}
 			break;
@@ -144,7 +137,8 @@ namespace AIML
 				//	<star/>
 				else if (strcmp(node->name(), "star") == 0) {
 					//	Insert reference to appropriate <star/> value
-					const unsigned int Index = 0;
+					auto StarIndex = node->first_attribute("index");
+					const unsigned int Index = (!StarIndex ? 0 : atoi(StarIndex->value())-1);
 					if (Setting == nullptr) {
 						Templates.back().push_back(TemplateWord(_Variables, _Stars, Thinking, Index));
 					}
@@ -169,9 +163,7 @@ namespace AIML
 				else {
 					printf("Unknown Tag <%s> %s\n", node->name(), node->value());
 					for (auto a = node->first_attribute(); a; a = a->next_attribute()) {
-						printf("<set/get %s", a->name());
-						printf("='%s'", a->value());
-						printf(">\n");
+						printf("\t%s\n\t%s\n", a->name(), a->value());
 					}
 				}
 				//	Walk through all children of this node
@@ -237,7 +229,6 @@ namespace AIML
 			*_Variables = Variables;
 			*_Stars = Stars;
 		}
-
 
 		operator std::string() const
 		{

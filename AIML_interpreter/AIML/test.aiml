@@ -20,7 +20,7 @@
 	<category>
 		<pattern>TEST ^ ^ ^ ^ ^ ^ ^ ^</pattern>
 		<template>
-			Test response <star/> <star/> <star/> <star/> <star/> <star/> <star/> <star/>
+			Test response <star index="1"/> <star index="2"/> <star index="3"/> <star index="4"/> <star index="5"/> <star index="6"/> <star index="7"/> <star index="8"/>
 		</template>
 	</category>
 	<category>
