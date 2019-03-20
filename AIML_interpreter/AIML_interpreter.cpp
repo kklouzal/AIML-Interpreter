@@ -34,14 +34,15 @@ int main()
 		}
 		else if (InputText == "dbg1") {
 			MyBot.DebugStars1();
-			GM.DebugCategories(MyBot.GetVars(), MyBot.GetStars());
 		}
 		else if (InputText == "dbg2") {
 			MyBot.DebugStars2();
-			GM.DebugCategories(MyBot.GetVars(), MyBot.GetStars());
 		}
 		else if (InputText == "pstr") {
 			MyBot.PrintStars();
+		}
+		else if (InputText == "pdb") {
+			GM.DebugCategories(MyBot.GetVars(), MyBot.GetStars());
 		}
 		else {
 			std::string Output = MyBot.InputText(InputText);

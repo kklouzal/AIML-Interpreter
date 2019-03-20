@@ -10,7 +10,7 @@ namespace AIML
 		GraphMaster* _GM;
 		std::string Topic;	// Current topic
 		std::string That;	// Current context
-		std::unordered_map<std::string, std::string*> Variables;	// Current stored variables
+		std::unordered_map<std::string, std::string> Variables;	// Current stored variables
 		std::array<std::string*, 8> Stars; // Current <star/> inputs
 	public:
 
@@ -46,7 +46,7 @@ namespace AIML
 			return "No Response Found..";
 		}
 
-		std::unordered_map<std::string, std::string*> * GetVars() { return &Variables; }
+		std::unordered_map<std::string, std::string> * GetVars() { return &Variables; }
 		std::array<std::string*, 8> * GetStars() { return &Stars; }
 
 	};

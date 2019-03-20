@@ -1,50 +1,26 @@
 <aiml>
 	<category>
-		<pattern>TEST $PRIORITY</pattern>
+		<pattern>TEST SET</pattern>
 		<template>
-			Priority Response
+			Setting "<set name="TestVar">Some Value</set>".
 		</template>
 	</category>
 	<category>
-		<pattern>TEST PRIORITY ZERO #</pattern>
+		<pattern>TEST SET *</pattern>
 		<template>
-			0 or more response
+			Setting "<set name="TestVar"><star/></set>".
 		</template>
 	</category>
 	<category>
-		<pattern>TEST PRIORITY _</pattern>
+		<pattern>TEST GET</pattern>
 		<template>
-			1 or more response
+			Getting "<get name="TestVar"/>".
 		</template>
 	</category>
 	<category>
-		<pattern>TEST WORD MATCH</pattern>
+		<pattern>TEST ^ ^ ^ ^ ^ ^ ^ ^</pattern>
 		<template>
-			word match response
-		</template>
-	</category>
-	<category>
-		<pattern>TEST ^ ZERO</pattern>
-		<template>
-			0 match response
-		</template>
-	</category>
-	<category>
-		<pattern>TEST ^ ZERO WORD</pattern>
-		<template>
-			0 match response
-		</template>
-	</category>
-	<category>
-		<pattern>TEST ZERO WORD</pattern>
-		<template>
-			0 match response
-		</template>
-	</category>
-	<category>
-		<pattern>TEST * * *</pattern>
-		<template>
-			1 match response <star/> <star/> <star/>
+			Test response <star/> <star/> <star/> <star/> <star/> <star/> <star/> <star/>
 		</template>
 	</category>
 	<category>
@@ -55,12 +31,6 @@
 				<li>Of course I know the <star/> to san jose!</li>
 				<li>Are you stupid? I know the <star/> to everything!</li>
 			</random>
-		</template>
-	</category>
-	<category>
-		<pattern>DO YOU KNOW WHAT THE ROCK IS COOKING</pattern>
-		<template>
-			It's 'Do you SMELL what the rock is cooking'.
 		</template>
 	</category>
 </aiml>

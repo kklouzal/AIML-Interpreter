@@ -17,7 +17,7 @@ namespace AIML
 	using std::list;
 
 	//	Node Types in priority order
-	enum NodeType {
+	enum NodeType : unsigned char {
 		PWord = 0,	// $Word
 		PZero = 1,	// #0+ Wildcard
 		POne = 2,	// _1+ Wildcard
@@ -193,7 +193,7 @@ namespace AIML
 		std::queue<rapidxml::file<>> XML;
 		std::queue<rapidxml::xml_document<>> Documents;
 
-		std::unordered_map<std::string, std::string*>* _DefaultVariables;	// Default Variables
+		std::unordered_map<std::string, std::string>* _DefaultVariables;	// Default Variables
 		std::array<std::string*, 8>* _DefaultStars;							// Default Stars
 
 		Node RootNode;						//	Root node for all pattern branches
@@ -324,7 +324,7 @@ namespace AIML
 
 		//	Try to match a pattern from the graph
 		//	Uses a bots 'Variable' and 'Star' list
-		Category* MatchPattern(string Pattern, std::unordered_map<std::string, std::string*>* _Variables, std::array<std::string*, 8>* _Stars)
+		Category* MatchPattern(string Pattern, std::unordered_map<std::string, std::string>* _Variables, std::array<std::string*, 8>* _Stars)
 		{
 			Category* Result = nullptr;
 			//	Tokenize our input pattern
@@ -335,7 +335,7 @@ namespace AIML
 			return Result;
 		}
 		
-		void DebugCategories(std::unordered_map<std::string, std::string*> * _Variables, std::array<std::string*, 8> * _Stars) {
+		void DebugCategories(std::unordered_map<std::string, std::string> * _Variables, std::array<std::string*, 8> * _Stars) {
 			for (auto Category : Categories) {
 				Category.PrintData(_Variables, _Stars);
 			}

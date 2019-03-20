@@ -4,88 +4,168 @@
 
 namespace AIML
 {
+	enum TemplateWordType : unsigned char {
+		TWT_Word = 0,
+		TWT_Wildcard = 1,
+		TWT_SetClear = 3,
+		TWT_SetWord = 4,
+		TWT_SetWildcard = 5,
+		TWT_Get = 6
+	};
+
 	class TemplateWord {
-		const unsigned int _StarIndex;
-		const char* _Word;
+		const TemplateWordType _Type;								//	Defines how this word acts
+		std::array<std::string*, 8>** _Stars;						//	<star/> list
+		std::unordered_map<std::string, std::string>** _Variables;	//	<set/get> list
+		const bool _Thinking;										//	Should this word output
+		const unsigned int _StarIndex;								//	star list index
+		const char* _Word;											//	word to print
+		std::string _VariableIndex;							//	variable list index
 	public:
-		std::array<std::string*, 8> ** _Stars;
 
-		TemplateWord(std::array<std::string*, 8>** Stars, const unsigned int StarIndex) : _Stars(Stars), _StarIndex(StarIndex), _Word(nullptr) {}
-		TemplateWord(std::array<std::string*, 8>** Stars, const char* Word) : _Stars(Stars), _StarIndex(0), _Word(Word) {}
+		//	Normal Word
+		TemplateWord(std::unordered_map<std::string, std::string>** Variables, std::array<std::string*, 8>** Stars, const bool Thinking, const char* Word)
+			: _Variables(Variables), _Stars(Stars), _Thinking(Thinking), _Type(TWT_Word), _StarIndex(0), _Word(Word), _VariableIndex() {}
+		//	Normal Wildcard
+		TemplateWord(std::unordered_map<std::string, std::string>** Variables, std::array<std::string*, 8>** Stars, const bool Thinking, const unsigned int StarIndex)
+			: _Variables(Variables), _Stars(Stars), _Thinking(Thinking), _Type(TWT_Wildcard), _StarIndex(StarIndex), _Word(nullptr), _VariableIndex() {}
+		//	<set> Clear
+		TemplateWord(std::unordered_map<std::string, std::string>** Variables, std::string VariableIndex)
+			: _Variables(Variables), _Stars(nullptr), _Thinking(false), _Type(TWT_SetClear), _StarIndex(0), _Word(nullptr), _VariableIndex(VariableIndex) {}
+		//	<set> Word
+		TemplateWord(std::unordered_map<std::string, std::string>** Variables, std::array<std::string*, 8>** Stars, const bool Thinking, const char* Word, std::string VariableIndex)
+			: _Variables(Variables), _Stars(Stars), _Thinking(Thinking), _Type(TWT_SetWord), _StarIndex(0), _Word(Word), _VariableIndex(VariableIndex) {}
+		//	<set> Wildcard
+		TemplateWord(std::unordered_map<std::string, std::string>** Variables, std::array<std::string*, 8>** Stars, const bool Thinking, const unsigned int StarIndex, std::string VariableIndex)
+			: _Variables(Variables), _Stars(Stars), _Thinking(Thinking), _Type(TWT_SetWildcard), _StarIndex(StarIndex), _Word(nullptr), _VariableIndex(VariableIndex) {}
+		//	<get>
+		TemplateWord(std::unordered_map<std::string, std::string>** Variables, std::array<std::string*, 8>** Stars, const bool Thinking, std::string VariableIndex)
+			: _Variables(Variables), _Stars(Stars), _Thinking(Thinking), _Type(TWT_Get), _StarIndex(0), _Word(nullptr), _VariableIndex(VariableIndex) {}
 
-		operator const char*() const
+		auto GetWord()
 		{
-			if (!_Word) {
+			switch (_Type)
+			{
+
+			case TWT_Word:
+			{
+				return _Word;
+			}
+			break;
+
+			case TWT_Wildcard:
+			{
 				return (**_Stars)[_StarIndex]->c_str();
 			}
-			return _Word;
+			break;
+
+			case TWT_SetClear:
+			{
+				(**_Variables)[_VariableIndex] = "";
+				return "";
+			}
+			break;
+
+			case TWT_SetWord:
+			{
+				(**_Variables)[_VariableIndex] += _Word;
+				if (_Thinking) {
+					return "";
+				}
+				else {
+					return (**_Variables)[_VariableIndex].c_str();
+				}
+			}
+			break;
+
+			case TWT_SetWildcard:
+			{
+				(**_Variables)[_VariableIndex] += *(**_Stars)[_StarIndex];
+				if (_Thinking) {
+					return "";
+				}
+				else {
+					return (**_Variables)[_VariableIndex].c_str();
+				}
+			}
+			break;
+
+			case TWT_Get:
+			{
+				return (**_Variables)[_VariableIndex].c_str();
+			}
+			break;
+
+			default: return "No Value";
+			}
 		}
 
-		friend std::ostream& operator<< (std::ostream& out, const TemplateWord& TWord)
-		{
-			if (!TWord._Word) {
-				out << *(**TWord._Stars)[TWord._StarIndex];
-			}
-			else {
-				out << TWord._Word;
-			}
-			return out;
+		operator const char*() {
+			return GetWord();
+		}
+
+		friend std::ostream& operator<< (std::ostream& out, TemplateWord& TWord) {
+			return out << TWord.GetWord();
 		}
 	};
 
 	class Category
 	{
-		//std::default_random_engine RNG;								// Random numbers
-		//std::uniform_int_distribution<int> TNum;				// Returns a random template index
-		std::unordered_map<std::string, std::string*>** _Variables;	// Current stored variables
+		//std::default_random_engine RNG;							// Random numbers
+		//std::uniform_int_distribution<int> TNum;					// Returns a random template index
+		std::unordered_map<std::string, std::string>** _Variables;	// Current stored variables
 		std::array<std::string*, 8>** _Stars;						// Current <star/> inputs
 		bool Srai;													// Rematch using this pattern
 		std::vector<std::list<TemplateWord>> Templates;				// Response templates
 		//	unordered_map 'SetList' string/string - Values to be set during template call
 
 		//	Recursively walk through a TEMPLATE constructing response templates for an AIML::Category
-		void WalkTemplate(const rapidxml::xml_node<>* node, bool IsThinking = false, bool IsSetting = false) {
+		void WalkTemplate(const rapidxml::xml_node<>* node, bool Thinking = false, char* Setting = nullptr) {
 			switch (node->type()) {
 			case rapidxml::node_element:
 			{
-				//	Encountered <random>
+				//	<random>
 				if (strcmp(node->name(), "random") == 0) {}
-				//	Encountered <li>
+				//	<li>
 				else if (strcmp(node->name(), "li") == 0) {
 					//	Create a new Response List at the back of Templates
 					Templates.emplace_back(std::list<TemplateWord>());
 				}
-				//	Encountered <think>
+				//	<think>
 				else if (strcmp(node->name(), "think") == 0) {
 					//	Set children of this node to 'think' status
-					IsThinking = true;
+					Thinking = true;
 				}
-				//	Encountered <srai>
+				//	<srai>
 				else if (strcmp(node->name(), "srai") == 0) {
-					//	Enable this category to use symbolic reduction (sari)
+					//	Enable this category to use symbolic reduction (srai)
 					SetSRAI();
 				}
+				//	<star/>
 				else if (strcmp(node->name(), "star") == 0) {
 					//	Insert reference to appropriate <star/> value
 					const unsigned int Index = 0;
-					Templates.back().push_back(TemplateWord(_Stars, Index));
-					std::cout << std::endl;
+					if (Setting == nullptr) {
+						Templates.back().push_back(TemplateWord(_Variables, _Stars, Thinking, Index));
+					}
+					else {
+						Templates.back().push_back(TemplateWord(_Variables, _Stars, Thinking, Index, Setting));
+					}
 				}
+				//	<get/>
 				else if (strcmp(node->name(), "get") == 0) {
 					//	Insert reference to appropriate <get name='...'/> value
 					auto VariableName = node->first_attribute("name");
-					std::cout << "Variable Name: " << VariableName->value() << std::endl;
-					//Templates.back().push_back(Variables->operator[](VariableName->value()));
-					//std::cout << "<get> " << node->value() << std::endl;
+					Templates.back().push_back(TemplateWord(_Variables, _Stars, Thinking, std::string(VariableName->value())));
 				}
+				//	<set>
 				else if (strcmp(node->name(), "set") == 0) {
-					//	Update reference to appropriate <set name='...'>...</set> value
+					//	Set children of this node to append their value onto a variable
 					auto VariableName = node->first_attribute("name");
-					std::cout << "Variable Name: " << VariableName->value() << std::endl;
-					std::cout << "Variable Value: " << node->value() << std::endl;
-					//Category_List.back().Templates.back().push_back(&Stars[0]);
-					//std::cout << "<set> " << node->value() << std::endl;
+					Setting = VariableName->value();
+					Templates.back().push_back(TemplateWord(_Variables, Setting));
 				}
+				//	Unknown tag
 				else {
 					printf("Unknown Tag <%s> %s\n", node->name(), node->value());
 					for (auto a = node->first_attribute(); a; a = a->next_attribute()) {
@@ -95,21 +175,24 @@ namespace AIML
 					}
 				}
 				//	Walk through all children of this node
-				//	If this node is <think> set 'IsThinking' to true
 				for (auto n = node->first_node(); n; n = n->next_sibling()) {
-					WalkTemplate(n, IsThinking);
+					WalkTemplate(n, Thinking, Setting);
 				}
 			}
 			break;
 
 			case rapidxml::node_data:
 			{
-				//	Add this data to the end of the current template
-				if (!IsThinking) {
-					if (Templates.empty()) {
-						Templates.emplace_back(std::list<TemplateWord>());
+				if (Setting == nullptr) {
+					if (!Thinking) {
+						if (Templates.empty()) {
+							Templates.emplace_back(std::list<TemplateWord>());
+						}
+						Templates.back().push_back(TemplateWord(_Variables, _Stars, Thinking, node->value()));
 					}
-					Templates.back().push_back(TemplateWord(_Stars, node->value()));
+				}
+				else {
+					Templates.back().push_back(TemplateWord(_Variables, _Stars, Thinking, node->value(), Setting));
 				}
 			}
 			break;
@@ -123,7 +206,7 @@ namespace AIML
 	public:
 
 		//	Capitalize every letter in the input patter and tokenize it into individual words.
-		Category(const rapidxml::xml_node<>* node, std::unordered_map<std::string, std::string*>** DefaultVariables, std::array<std::string*, 8>** DefaultStars)
+		Category(const rapidxml::xml_node<>* node, std::unordered_map<std::string, std::string>** DefaultVariables, std::array<std::string*, 8>** DefaultStars)
 			: _Variables(DefaultVariables), _Stars(DefaultStars), Srai(false)/*, RNG()*/ {
 			for (auto Node = node->first_node(); Node; Node = Node->next_sibling()) {
 				WalkTemplate(Node);
@@ -132,7 +215,7 @@ namespace AIML
 		}
 
 		//	So we can visually debug the state of our memory
-		void PrintData(std::unordered_map<std::string, std::string*> * Variables, std::array<std::string*, 8> * Stars) {
+		void PrintData(std::unordered_map<std::string, std::string> * Variables, std::array<std::string*, 8> * Stars) {
 			*_Variables = Variables;
 			*_Stars = Stars;
 			std::cout << std::endl << "Category Data" << std::endl;
@@ -150,10 +233,11 @@ namespace AIML
 			}
 		}
 
-		void SetPointers(std::unordered_map<std::string, std::string*>* Variables, std::array<std::string*, 8>* Stars) {
+		void SetPointers(std::unordered_map<std::string, std::string>* Variables, std::array<std::string*, 8>* Stars) {
 			*_Variables = Variables;
 			*_Stars = Stars;
 		}
+
 
 		operator std::string() const
 		{
