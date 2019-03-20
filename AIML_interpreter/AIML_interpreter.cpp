@@ -36,18 +36,18 @@ int main()
 			}
 			else if (InputText == "dbg1") {
 				MyBot.DebugStars1();
-				GM.DebugCategories(&MyBot.Variables, &MyBot.Stars);
+				GM.DebugCategories(MyBot.GetVars(), MyBot.GetStars());
 			}
 			else if (InputText == "dbg2") {
 				MyBot.DebugStars2();
-				GM.DebugCategories(&MyBot.Variables, &MyBot.Stars);
+				GM.DebugCategories(MyBot.GetVars(), MyBot.GetStars());
 			}
 			else if (InputText == "pstr") {
 				MyBot.PrintStars();
 			}
 			else {
 				//std::string Output = MyBot.InputText(InputText);
-				GM.MatchPattern(InputText, &MyBot.Variables, &MyBot.Stars);
+				//GM.MatchPattern(InputText, &MyBot.Variables, &MyBot.Stars);
 				//std::cout << "BOT: " << Output.c_str() << std::endl;
 			}
 		}

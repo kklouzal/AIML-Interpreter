@@ -2,12 +2,33 @@
 
 namespace AIML
 {
+	class TemplateWord {
+		const unsigned int _StarIndex;
+		const char* _Word;
+	public:
+		std::array<std::string*, 8> ** _Stars;
+
+		TemplateWord(std::array<std::string*, 8>** Stars, const unsigned int StarIndex) : _Stars(Stars), _StarIndex(StarIndex), _Word(nullptr) {}
+		TemplateWord(std::array<std::string*, 8>** Stars, const char* Word) : _Stars(Stars), _StarIndex(0), _Word(Word) {}
+
+		friend std::ostream& operator<< (std::ostream& out, const TemplateWord& TWord)
+		{
+			if (!TWord._Word) {
+				out << *(**TWord._Stars)[TWord._StarIndex];
+			}
+			else {
+				out << TWord._Word;
+			}
+			return out;
+		}
+	};
+
 	class Category
 	{
-		std::unordered_map<std::string, std::string*> *Variables;	// Current stored variables
-		std::array<std::string*, 8> *Stars;							// Current <star/> inputs
+		std::unordered_map<std::string, std::string*>** _Variables;	// Current stored variables
+		std::array<std::string*, 8>** _Stars;						// Current <star/> inputs
 		bool Srai;													// Rematch using this pattern
-		std::vector<std::list<std::string*>> Templates;				// Response templates
+		std::vector<std::list<TemplateWord>> Templates;				// Response templates
 		//	unordered_map 'SetList' string/string - Values to be set during template call
 
 		//	Recursively walk through a TEMPLATE constructing response templates for an AIML::Category
@@ -20,7 +41,7 @@ namespace AIML
 				//	Encountered <li>
 				else if (strcmp(node->name(), "li") == 0) {
 					//	Create a new Response List at the back of Templates
-					Templates.emplace_back(std::list<std::string*>());
+					Templates.emplace_back(std::list<TemplateWord>());
 				}
 				//	Encountered <think>
 				else if (strcmp(node->name(), "think") == 0) {
@@ -34,13 +55,15 @@ namespace AIML
 				}
 				else if (strcmp(node->name(), "star") == 0) {
 					//	Insert reference to appropriate <star/> value
-					Templates.back().push_back(Stars->operator[](0));
+					const unsigned int Index = 0;
+					Templates.back().push_back(TemplateWord(_Stars, Index));
+					std::cout << std::endl;
 				}
 				else if (strcmp(node->name(), "get") == 0) {
 					//	Insert reference to appropriate <get name='...'/> value
 					auto VariableName = node->first_attribute("name");
 					std::cout << "Variable Name: " << VariableName->value() << std::endl;
-					Templates.back().push_back(Variables->operator[](VariableName->value()));
+					//Templates.back().push_back(Variables->operator[](VariableName->value()));
 					//std::cout << "<get> " << node->value() << std::endl;
 				}
 				else if (strcmp(node->name(), "set") == 0) {
@@ -72,11 +95,9 @@ namespace AIML
 				//	Add this data to the end of the current template
 				if (!IsThinking) {
 					if (Templates.empty()) {
-						Templates.emplace_back(std::list<std::string*>(1, new std::string(node->value())));
+						Templates.emplace_back(std::list<TemplateWord>());
 					}
-					else {
-						Templates.back().emplace_back(new std::string(node->value()));
-					}
+					Templates.back().push_back(TemplateWord(_Stars, node->value()));
 				}
 			}
 			break;
@@ -85,19 +106,22 @@ namespace AIML
 			}
 		}
 
+		void SetSRAI() { Srai = true; }
+
 	public:
 
 		//	Capitalize every letter in the input patter and tokenize it into individual words.
-		Category(const rapidxml::xml_node<>* node, std::unordered_map<std::string, std::string*>* _Variables, std::array<std::string*, 8>* _Stars) : Variables(_Variables), Stars(_Stars), Srai(false) {
+		Category(const rapidxml::xml_node<>* node, std::unordered_map<std::string, std::string*>** DefaultVariables, std::array<std::string*, 8>** DefaultStars)
+			: _Variables(DefaultVariables), _Stars(DefaultStars), Srai(false) {
 			for (auto Node = node->first_node(); Node; Node = Node->next_sibling()) {
 				WalkTemplate(Node);
 			}
 		}
 
 		//	So we can visually debug the state of our memory
-		void PrintData(std::unordered_map<std::string, std::string*>* _Variables, std::array<std::string*, 8>* _Stars) {
-			Variables = _Variables;
-			Stars = _Stars;
+		void PrintData(std::unordered_map<std::string, std::string*> * Variables, std::array<std::string*, 8> * Stars) {
+			*_Variables = Variables;
+			*_Stars = Stars;
 			std::cout << std::endl << "Category Data" << std::endl;
 			std::cout << "\tSrai: " << Srai << std::endl;
 			std::cout << "\tTemplates: " << std::endl;
@@ -107,12 +131,10 @@ namespace AIML
 				TemplateNum++;
 				unsigned int PieceNum = 0;
 				for (auto Piece : Template) {
-					std::cout << "\t\t\t[" << PieceNum << "]: " << *Piece << std::endl;
+					std::cout << "\t\t\t[" << PieceNum << "]: " << Piece << std::endl;
 					PieceNum++;
 				}
 			}
 		}
-
-		void SetSRAI() { Srai = true; }
 	};
 }

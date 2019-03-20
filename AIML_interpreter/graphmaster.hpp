@@ -188,12 +188,12 @@ namespace AIML
 		std::queue<rapidxml::file<>> XML;
 		std::queue<rapidxml::xml_document<>> Documents;
 
+		std::unordered_map<std::string, std::string*>* _DefaultVariables;	// Default Variables
+		std::array<std::string*, 8>* _DefaultStars;							// Default Stars
+
 		Node RootNode;						//	Root node for all pattern branches
 		unordered_set<string> Words;		//	Unique set of words across all branches
 		std::vector<Category> Categories;	//	All graphed categories (templates)
-
-		std::unordered_map<std::string, std::string*> DVariables;	// Current stored variables
-		std::array<std::string*, 8> DStars; // Current <star/> inputs
 
 		//	Tokenize an input string
 		//	Tokens are converted to UPPER CASE
@@ -245,7 +245,7 @@ namespace AIML
 					continue;
 				}
 				//	Start constructing a new CATEGORY
-				Categories.emplace_back(Category(Template_Node, &DVariables, &DStars));
+				Categories.push_back(Category(Template_Node, &_DefaultVariables, &_DefaultStars));
 
 				//	Dissect THAT
 				/*auto That_Node = Category_Node->first_node("that");
@@ -264,7 +264,7 @@ namespace AIML
 
 	public:
 
-		GraphMaster() : RootNode(), DStars({ new string("*1*"),new string("*2*"),new string("*3*"),new string("*4*"),new string("*5*"),new string("*6*"),new string("*7*"),new string("*8*") }) {
+		GraphMaster() : RootNode(), _DefaultVariables(nullptr), _DefaultStars(nullptr) {
 			fs::path AIML_Folder = fs::current_path().append("AIML");
 			std::cout << AIML_Folder << std::endl;
 			if (fs::exists(AIML_Folder) && fs::is_directory(AIML_Folder)) {
@@ -313,9 +313,6 @@ namespace AIML
 			while (!XML.empty()) {
 				XML.pop();
 			}
-			for (auto Obj : DStars) {
-				delete Obj;
-			}
 		}
 
 		//	Try to match a pattern from the graph
@@ -328,7 +325,7 @@ namespace AIML
 			RootNode.FindTokens(Tokens.begin(), Tokens.end());
 		}
 		
-		void DebugCategories(std::unordered_map<std::string, std::string*>* _Variables, std::array<std::string*, 8>* _Stars) {
+		void DebugCategories(std::unordered_map<std::string, std::string*> * _Variables, std::array<std::string*, 8> * _Stars) {
 			for (auto Category : Categories) {
 				Category.PrintData(_Variables, _Stars);
 			}
