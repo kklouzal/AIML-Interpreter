@@ -24,11 +24,13 @@ Working off of (http://callmom.pandorabots.com/static/reference/)
 ###### `<template>`
 ###### `<think>`
 ###### `<topic>` *Not yet if defined inside `<category>`
+###### `<set name="PREDICATE_NAME">`
+###### `<get name="PREDICATE_NAME" />`
 
 ### ToDo:
 ###### `<bot name="PROPERTY_NAME" />`
 ###### `<br />`
-###### `<condition name="PROPERTY_NAME">`
+###### `<condition name="PREDICATE_NAME">`
 ###### `<date />`
 ###### `<denormalize>`
 ###### `<eval>`
@@ -36,7 +38,6 @@ Working off of (http://callmom.pandorabots.com/static/reference/)
 ###### `<first>`
 ###### `<formal>`
 ###### `<gender>`
-###### `<get name="PREDICATE_NAME" />`
 ###### `<id />`
 ###### `<img src="http://image.source.format" />`
 ###### `<input /'>`
@@ -55,7 +56,6 @@ Working off of (http://callmom.pandorabots.com/static/reference/)
 ###### `<response />`
 ###### `<rest>`
 ###### `<sentence>`
-###### `<set>`
 ###### `<size />`
 ###### `<sr />`
 ###### `<srai>`
