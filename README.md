@@ -6,6 +6,14 @@ This is a WIP with many features still left to implement.
 
 Working off of (http://callmom.pandorabots.com/static/reference/) 
 
+### Pattern Matching Priority:
+###### `@` Priority Word
+###### `#` 0+ Priority Wildcard
+###### `_` 1+ Priority Wildcard
+###### `ABC123` Word
+###### `^` 0+ Wildcard
+###### `*` 1+ Wildcard
+
 ### Completed:
 ###### `<aiml>`
 ###### `<category>`
