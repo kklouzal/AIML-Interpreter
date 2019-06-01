@@ -139,6 +139,9 @@ namespace AIML
 					//	Insert reference to appropriate <star/> value
 					auto StarIndex = node->first_attribute("index");
 					const unsigned int Index = (!StarIndex ? 0 : atoi(StarIndex->value())-1);
+					if (Templates.empty()) {
+						Templates.emplace_back(std::list<TemplateWord>());
+					}
 					if (Setting == nullptr) {
 						Templates.back().push_back(TemplateWord(_Variables, _Stars, Thinking, Index));
 					}
@@ -150,14 +153,30 @@ namespace AIML
 				else if (strcmp(node->name(), "get") == 0) {
 					//	Insert reference to appropriate <get name='...'/> value
 					auto VariableName = node->first_attribute("name");
-					Templates.back().push_back(TemplateWord(_Variables, _Stars, Thinking, std::string(VariableName->value())));
+					if (VariableName == nullptr) {
+						std::cout << "Skipping <get> - No 'name' Attribute" << std::endl;
+					}
+					else {
+						if (Templates.empty()) {
+							Templates.emplace_back(std::list<TemplateWord>());
+						}
+						Templates.back().push_back(TemplateWord(_Variables, _Stars, Thinking, std::string(VariableName->value())));
+					}
 				}
 				//	<set>
 				else if (strcmp(node->name(), "set") == 0) {
 					//	Set children of this node to append their value onto a variable
 					auto VariableName = node->first_attribute("name");
-					Setting = VariableName->value();
-					Templates.back().push_back(TemplateWord(_Variables, Setting));
+					if (VariableName == nullptr) {
+						std::cout << "Skipping <set> - No 'name' Attribute" << std::endl;
+					}
+					else {
+						Setting = VariableName->value();
+						if (Templates.empty()) {
+							Templates.emplace_back(std::list<TemplateWord>());
+						}
+						Templates.back().push_back(TemplateWord(_Variables, Setting));
+					}
 				}
 				//	Unknown tag
 				else {

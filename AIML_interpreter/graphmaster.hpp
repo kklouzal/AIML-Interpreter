@@ -36,7 +36,12 @@ namespace AIML
 		NodeType _NodeType;
 		unsigned short _NextStarNum;
 
-		Node(Node* Parent = nullptr, NodeType NType = NodeType::ROOT) : _Parent(Parent), EndPoint(false), _Category(nullptr), _NodeType(NType), _NextStarNum(!_Parent ? 0 : _Parent->_NextStarNum) {}
+		Node(Node* Parent = nullptr, NodeType NType = NodeType::ROOT) : _Parent(Parent), EndPoint(false), _Category(nullptr), _NodeType(NType), _NextStarNum(!_Parent ? 0 : _Parent->_NextStarNum) {
+			if (_NextStarNum > 8) {
+				std::cout << "Star Index > 8 " << _NextStarNum << std::endl;
+				_NextStarNum = 8;
+			}
+		}
 		
 		//	Process a token, removing it from the queue before passing deeper
 		//	Returns the final node in the chain
@@ -45,7 +50,9 @@ namespace AIML
 				EndPoint = true;
 				//	End of tokens
 				//	Store <template> in this node
+#ifdef PARSE_DEBUG
 				std::cout << "End Branch" << std::endl;
+#endif
 				return this;
 			}
 			else {
@@ -59,7 +66,9 @@ namespace AIML
 				case '*': NType = NodeType::One; ++_NextStarNum; break;
 				default: break;
 				}
+#ifdef PARSE_DEBUG
 				std::cout << Token << "(" << NType << ")->";
+#endif
 				Tokens.pop();
 				return Branches.emplace(Token, Node(this, NType)).first->second.ProcessTokens(Tokens);
 			}
@@ -72,26 +81,34 @@ namespace AIML
 				//	#	0 or more
 				auto Branch = Branches.find("#");
 				if (Branch != Branches.end()) {
+#ifdef FIND_DEBUG
 					std::cout << "TRAILING--> #" << std::endl;
+#endif
 					//	Don't increment 'Tokens' on a trailing 0+ wildcard
 					if (Branch->second.FindTokens(Tokens, End, Result, _Stars)) { (*(*_Stars)[_NextStarNum-1]).clear(); return true; }
 				}
 				//	^ 0 or more
 				Branch = Branches.find("^");
 				if (Branch != Branches.end()) {
+#ifdef FIND_DEBUG
 					std::cout << "TRAILING--> ^" << std::endl;
+#endif
 					//	Don't increment 'Tokens' on a trailing 0+ wildcard
 					if (Branch->second.FindTokens(Tokens, End, Result, _Stars)) { (*(*_Stars)[_NextStarNum-1]).clear(); return true; }
 				}
 				if (EndPoint) {
 					//	Return <template> from this node
+#ifdef FIND_DEBUG
 					std::cout << "PATTERN MATCH" << std::endl;
+#endif
 					Result = _Category;
 					return true;
 				}
 				else {
 					//	Incomplete pattern
+#ifdef FIND_DEBUG
 					std::cout << "PATTERN INCOMPLETE" << std::endl;
+#endif
 					Result = nullptr;
 					return false;
 				}
@@ -99,14 +116,18 @@ namespace AIML
 				//	$	Priority
 				auto Branch = Branches.find("$" + *Tokens);
 				if (Branch != Branches.end()) {
+#ifdef FIND_DEBUG
 					std::cout << "[" << *Tokens << "]--> $" << std::endl;
+#endif
 					if (Branch->second.FindTokens(++Tokens, End, Result, _Stars)) {	return true; }
 					else { --Tokens; }
 				}
 				//	#	0 or more
 				Branch = Branches.find("#");
 				if (Branch != Branches.end()) {
+#ifdef FIND_DEBUG
 					std::cout << "[" << *Tokens << "]--> #" << std::endl;
+#endif
 					//	Treat 0+ wildcards as if they match 1 word before matching 0
 					if (Branch->second.FindTokens(++Tokens, End, Result, _Stars)) { *(*_Stars)[_NextStarNum - 1] = *--Tokens; return true; }
 					else { --Tokens; }
@@ -114,21 +135,27 @@ namespace AIML
 				//	_ 	1 or more
 				Branch = Branches.find("_");
 				if (Branch != Branches.end()) {
+#ifdef FIND_DEBUG
 					std::cout << "[" << *Tokens << "]--> _" << std::endl;
+#endif
 					if (Branch->second.FindTokens(++Tokens, End, Result, _Stars)) { *(*_Stars)[_NextStarNum - 1] = *--Tokens; return true; }
 					else { --Tokens; }
 				}
 				//	word
 				Branch = Branches.find(*Tokens);
 				if (Branch != Branches.end()) {
+#ifdef FIND_DEBUG
 					std::cout << "[" << *Tokens << "]--> WORD" << std::endl;
+#endif
 					if (Branch->second.FindTokens(++Tokens, End, Result, _Stars)) {	return true; }
 					else { --Tokens; }
 				}
 				//	^ 0 or more
 				Branch = Branches.find("^");
 				if (Branch != Branches.end()) {
+#ifdef FIND_DEBUG
 					std::cout << "[" << *Tokens << "]--> ^" << std::endl;
+#endif
 					//	Treat 0+ wildcards as if they match 1 word before matching 0
 					if (Branch->second.FindTokens(++Tokens, End, Result, _Stars)) { *(*_Stars)[_NextStarNum - 1] = *--Tokens; return true; }
 					else { --Tokens; }
@@ -136,40 +163,54 @@ namespace AIML
 				//	* 1 or more
 				Branch = Branches.find("*");
 				if (Branch != Branches.end()) {
+#ifdef FIND_DEBUG
 					std::cout << "[" << *Tokens << "]--> *" << std::endl;
+#endif
 					if (Branch->second.FindTokens(++Tokens, End, Result, _Stars)) { *(*_Stars)[_NextStarNum-1] = *--Tokens;	return true; }
 					else { --Tokens; }
 				}
 				//	No direct node match; Rematch current node if wildcard
 				if (_NodeType == NodeType::PZero) {
 					//	Increment 'Tokens' and rematch this node
+#ifdef FIND_DEBUG
 					std::cout << "(" << *Tokens << ") # +" << std::endl;
+#endif
 					if (FindTokens(++Tokens, End, Result, _Stars)) { *--Tokens += std::string(" " + *--Tokens);	return true; }
 					else { --Tokens; }
 				}
 				else if (_NodeType == NodeType::POne) {
 					//	Increment 'Tokens' and rematch this node
+#ifdef FIND_DEBUG
 					std::cout << "(" << *Tokens << ") _ +" << std::endl;
+#endif
 					if (FindTokens(++Tokens, End, Result, _Stars)) { *--Tokens += std::string(" " + *--Tokens);	return true; }
 					else { --Tokens; }
 				}
 				else if (_NodeType == NodeType::Zero) {
 					//	Increment 'Tokens' and rematch this node
+#ifdef FIND_DEBUG
 					std::cout << "(" << *Tokens << ") ^ +" << std::endl;
+#endif
 					if (FindTokens(++Tokens, End, Result, _Stars)) { *--Tokens += std::string(" " + *--Tokens);	return true; }
 					else { --Tokens; }
 				}
 				else if (_NodeType == NodeType::One) {
 					//	Increment 'Tokens' and rematch this node
+#ifdef FIND_DEBUG
 					std::cout << "(" << *Tokens << ") * +" << std::endl;
+#endif
 					if (FindTokens(++Tokens, End, Result, _Stars)) { *--Tokens += std::string(" " + *--Tokens);	return true; }
 					else { --Tokens; }
 				}
 				if (_Parent) {
+#ifdef FIND_DEBUG
 					std::cout << "<--[" << *Tokens << "] NODE DEPLEATED" << std::endl;
+#endif
 				}
 				else {
+#ifdef FIND_DEBUG
 					std::cout << "[" << *Tokens << "] NO MATCH AVAILABLE" << std::endl;
+#endif
 				}
 				Result = nullptr;
 				return false;
