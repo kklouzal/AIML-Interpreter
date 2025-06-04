@@ -7,16 +7,17 @@
 #include <list>
 #include <array>
 #include <unordered_map>
-#include <filesystem>
 #include <functional>
 #include <iostream>
 #include <sstream>
+#include <ctime>
+#include <filesystem>
 #include "rapidxml.hpp"
 #include "rapidxml_utils.hpp"
 
 namespace AIML
 {
-	namespace fs = std::experimental::filesystem;
+	namespace fs = std::filesystem;
 
 	std::list<std::string> split(const std::string& s, char delimiter=' ')
 	{
@@ -33,15 +34,12 @@ namespace AIML
 	class Category
 	{
 	public:
-		//std::string Pattern;	// Input pattern
 		std::list<std::string> Pattern;	// Input pattern tokenized into individual words
 		std::string Topic;		// Topic of this category
 		std::string That;		// Context limiter for this category
 		bool Srai;				// Rematch using this pattern
 		std::vector<std::list<std::string*>> Templates;	// Response templates
-		//	unordered_map 'SetList' string/string - Values to be set during template call
 
-		//	Capitalize every letter in the input patter and tokenize it into individual words.
 		Category(std::string UsePattern, std::string UseTopic) : Topic(UseTopic), Srai(false) {
 			for (auto& x : UsePattern) {
 				x = toupper(x);
@@ -57,12 +55,11 @@ namespace AIML
 		~Category() {
 			for (auto Template : Templates) {
 				for (auto Piece : Template) {
-					//delete Piece;
+					delete Piece;
 				}
 			}
 		}
 
-		//	So we can visually debug the state of our memory
 		void PrintData() {
 			std::cout << std::endl << "Category Data" << std::endl;
 			std::cout << "\tPattern:";
@@ -121,7 +118,30 @@ namespace AIML
 			case rapidxml::node_element:
 			{
 				//	Encountered <random>
-				if (strcmp(node->name(), "random") == 0) {}
+				if (strcmp(node->name(), "random") == 0) {
+					// Need to store the beginning position of random templates
+					size_t randomStartIndex = Category_List.back().Templates.size();
+					
+					// Each <li> will add a template, we'll keep track of how many to choose one randomly later
+					int liCount = 0;
+					for (auto li_node = node->first_node("li"); li_node; li_node = li_node->next_sibling("li")) {
+						Category_List.back().Templates.emplace_back(std::list<std::string*>());
+						liCount++;
+						
+						// Process the content of this <li> element
+						for (auto content_node = li_node->first_node(); content_node; content_node = content_node->next_sibling()) {
+							WalkTemplate(content_node, IsThinking, IsSetting);
+						}
+						
+						// Also handle text directly in the <li> tag
+						if (li_node->value() && strlen(li_node->value()) > 0) {
+							Category_List.back().Templates.back().push_back(new std::string(li_node->value()));
+						}
+					}
+					
+					// Don't need to recurse as we've manually processed children
+					return;
+				}
 				//	Encountered <li>
 				else if (strcmp(node->name(), "li") == 0) {
 					//	Create a new Response List at the back of Templates
@@ -138,23 +158,60 @@ namespace AIML
 					Category_List.back().SetSRAI();
 				}
 				else if (strcmp(node->name(), "star") == 0) {
-					//	Insert reference to appropriate <star/> value
-					Category_List.back().Templates.back().push_back(&Stars[0]);
+					 // Insert reference to appropriate <star/> value
+					auto indexAttr = node->first_attribute("index");
+					int index = 0; // Default to first star
+					
+					if (indexAttr) {
+						index = std::stoi(indexAttr->value()) - 1; // AIML uses 1-based indexing
+						// Bounds checking
+						if (index < 0 || index >= Stars.size()) {
+							index = 0;
+						}
+					}
+					
+					Category_List.back().Templates.back().push_back(&Stars[index]);
 				}
 				else if (strcmp(node->name(), "get") == 0) {
 					//	Insert reference to appropriate <get name='...'/> value
 					auto VariableName = node->first_attribute("name");
-					std::cout << "Variable Name: " << VariableName->value() << std::endl;
-					Category_List.back().Templates.back().push_back(&Variables[VariableName->value()]);
-					//std::cout << "<get> " << node->value() << std::endl;
+					if (VariableName) {
+						// Make sure the variable exists
+						if (Variables.find(VariableName->value()) == Variables.end()) {
+							Variables[VariableName->value()] = "";
+						}
+						Category_List.back().Templates.back().push_back(&Variables[VariableName->value()]);
+					}
 				}
 				else if (strcmp(node->name(), "set") == 0) {
-					//	Update reference to appropriate <set name='...'>...</set> value
+					// Update reference to appropriate <set name='...'>...</set> value
 					auto VariableName = node->first_attribute("name");
-					std::cout << "Variable Name: " << VariableName->value() << std::endl;
-					std::cout << "Variable Value: " << node->value() << std::endl;
-					//Category_List.back().Templates.back().push_back(&Stars[0]);
-					//std::cout << "<set> " << node->value() << std::endl;
+					if (VariableName) {
+						// Create or update the variable
+						std::string varName = VariableName->value();
+						Variables[varName] = "";
+						
+						// Create a temporary string to store the content
+						std::string* tempContent = new std::string();
+						
+						// Process child nodes to build content
+						for (auto child = node->first_node(); child; child = child->next_sibling()) {
+							// Get text content from child nodes
+							if (child->type() == rapidxml::node_data) {
+								*tempContent += child->value();
+							}
+							// Process other node types recursively if needed
+						}
+						
+						// Set the variable value
+						Variables[varName] = *tempContent;
+						
+						// Add variable reference to template
+						Category_List.back().Templates.back().push_back(&Variables[varName]);
+						
+						// Clean up temporary string
+						delete tempContent;
+					}
 				}
 				else {
 					printf("Unknown Tag <%s> %s\n", node->name(), node->value());
@@ -223,17 +280,19 @@ namespace AIML
 		//	Default debugging values for the Stars array.
 		Bot() : Stars({ "*1*","*2*","*3*","*4*","*5*","*6*","*7*","*8*" })
 		{
-			fs::path AIML_Folder = fs::current_path().append("AIML");
+			// Seed random number generator
+			std::srand(static_cast<unsigned int>(std::time(nullptr)));
+			
+			fs::path AIML_Folder = fs::current_path() / "AIML";
 			std::cout << AIML_Folder << std::endl;
 			if (fs::exists(AIML_Folder) && fs::is_directory(AIML_Folder)) {
 				for (const auto& entry : fs::directory_iterator(AIML_Folder))
 				{
 					auto filename = entry.path().filename();
-					if (fs::is_directory(entry.status()))
-					{
+					if (fs::is_directory(entry.path())) {
 						std::cout << "Unable to load nested folders (yet)" << std::endl;
 					}
-					else if (fs::is_regular_file(entry.status())) {
+					else if (fs::is_regular_file(entry.path())) {
 						std::cout << "Loading (" << filename << ").." << std::endl;
 						XML.emplace(entry.path().string().c_str());
 						Documents.emplace();
@@ -242,16 +301,19 @@ namespace AIML
 							Documents.back().parse<rapidxml::parse_default | rapidxml::parse_normalize_whitespace>(XML.back().data());
 							//	Iterate through the XML extracting C++ objects from the AIML
 							rapidxml::xml_node<>* Root_Node = Documents.back().first_node("aiml");
-							for (rapidxml::xml_node<>* Topic_Node = Root_Node->first_node("topic"); Topic_Node; Topic_Node = Topic_Node->next_sibling())
+							if (!Root_Node) {
+								std::cout << "\tError: Not a valid AIML file (missing <aiml> root node)" << std::endl;
+								continue;
+							}
+
+							for (rapidxml::xml_node<>* Topic_Node = Root_Node->first_node("topic"); Topic_Node; Topic_Node = Topic_Node->next_sibling("topic"))
 							{
-								if (strcmp(Topic_Node->name(), "topic") == 0) {
-									auto Topic_Name = Topic_Node->first_attribute("name");
-									if (Topic_Name == NULL) {
-										std::cout << "Skipping Malformed Topic: No NAME" << std::endl;
-										continue;
-									}
-									ParseCategories(Topic_Node, Topic_Name->value());
+								auto Topic_Name = Topic_Node->first_attribute("name");
+								if (Topic_Name == NULL) {
+									std::cout << "Skipping Malformed Topic: No NAME" << std::endl;
+									continue;
 								}
+								ParseCategories(Topic_Node, Topic_Name->value());
 							}
 							ParseCategories(Root_Node);
 						}
@@ -259,6 +321,14 @@ namespace AIML
 							std::cout << "\tXML Error: " << e.what() << " - " << e.where<char>() << std::endl;
 						}
 					}
+				}
+			} else {
+				std::cout << "AIML folder not found or not a directory. Creating folder..." << std::endl;
+				try {
+					fs::create_directory(AIML_Folder);
+					std::cout << "AIML folder created. Please add AIML files to continue." << std::endl;
+				} catch (const std::exception& e) {
+					std::cout << "Error creating AIML folder: " << e.what() << std::endl;
 				}
 			}
 		}
@@ -273,83 +343,165 @@ namespace AIML
 		}
 
 		std::string InputText(std::string InText) {
+			// Reset Stars array before processing
+			for (int i = 0; i < Stars.size(); i++) {
+				Stars[i] = "*" + std::to_string(i+1) + "*";
+			}
+            
 			std::vector<Category*> Matches;
-
-			auto InWords = split(InText);
+			
+			// Capitalize input for matching
+			std::string uppercaseInput = InText;
+			for (auto& c : uppercaseInput) {
+				c = toupper(c);
+			}
+			
+			auto InWords = split(uppercaseInput);
 			const auto Input_End = InWords.cend();
-
-			for (auto Cat : Category_List) {
+			
+			// Find matching categories
+			for (auto& Cat : Category_List) {
 				auto Input = InWords.cbegin();
 				auto Pattern = Cat.Pattern.cbegin();
-
-				const auto Pattern_Begin = Cat.Pattern.cbegin();	//	ToDo: Find a way to get rid of 'Pattern_Begin'
+				
+				const auto Pattern_Begin = Cat.Pattern.cbegin();
 				const auto Pattern_End = Cat.Pattern.cend();
-
+				
+				bool IsMatch = true;
 				bool InputEnd = false;
 				bool PatternEnd = false;
-				while (true) {
-
-					//	Direct Wildcard Match
-					if (*Pattern == "*") {
+				int starIndex = 0;
+				
+				while (IsMatch && !(InputEnd && PatternEnd)) {
+					// Direct Wildcard Match
+					if (Pattern != Pattern_End && *Pattern == "*") {
+						 // Start of wildcard capture
+						auto wildcardStart = Input;
+						std::string wildcardValue;
+						
+						// Handle wildcard by consuming input until next pattern match or end
+						Pattern++;
+						PatternEnd = (Pattern == Pattern_End);
+						
 						if (PatternEnd) {
-							//	Store previous wildcard value
-							std::cout << *Input << "\t-^\t" << *Pattern << std::endl;
+							// If wildcard is last element, capture all remaining input
+							std::stringstream wildcardStream;
+							while (Input != InWords.cend()) {
+								wildcardStream << *Input << " ";
+								Input++;
+							}
+							
+							// Store captured value in next Star slot
+							if (starIndex < Stars.size()) {
+								Stars[starIndex++] = wildcardStream.str();
+							}
+                            
+							Input = InWords.cend();
+							InputEnd = true;
+							break;
+						} else {
+							// Find next matching word after wildcard
+							bool foundNext = false;
+							auto searchInput = Input;
+							
+							while (searchInput != InWords.cend()) {
+								if (equal((*searchInput).begin(), (*searchInput).end(), (*Pattern).begin(), (*Pattern).end(),
+									[](char I, char P) { return toupper(I) == P; })) {
+									foundNext = true;
+									break;
+								}
+								searchInput++;
+							}
+							
+							if (!foundNext) {
+								IsMatch = false;
+								break;
+							}
+                            
+							// Capture wildcard text
+							std::stringstream wildcardStream;
+							while (Input != searchInput) {
+								wildcardStream << *Input << " ";
+								Input++;
+							}
+							
+							// Store captured value in next Star slot
+							if (starIndex < Stars.size()) {
+								Stars[starIndex++] = wildcardStream.str();
+							}
 						}
-						else {
-							//	Store direct wildcard value
-							std::cout << *Input << "\t->\t" << *Pattern << std::endl;
-						}
 					}
-					//	Direct Word Match
-					else if (equal((*Input).begin(), (*Input).end(), (*Pattern).begin(), (*Pattern).end(),
-						[](char I, char P) { return toupper(I) == P; })) {
-						//	Do nothing on word match?
-						std::cout << *Input << "\t->\t" << *Pattern << std::endl;
+					// Direct Word Match
+					else if (Input != Input_End && Pattern != Pattern_End && 
+							equal((*Input).begin(), (*Input).end(), (*Pattern).begin(), (*Pattern).end(),
+							[](char I, char P) { return toupper(I) == P; })) {
+						Input++;
+						Pattern++;
+						InputEnd = (Input == Input_End);
+						PatternEnd = (Pattern == Pattern_End);
 					}
-					//	Previous wildcard match
-					else if (Pattern != Pattern_Begin && *--Pattern == "*") {
-						//	Store wildcard value
-						std::cout << *Input << "\t-^\t" << *Pattern << std::endl;
-					}
-					//	Mismatch
 					else {
-						if (Pattern != Pattern_Begin) {
-							std::cout << "Mismatch\n";
-						}
-						break;	// Break to next category
+						IsMatch = false;
+						break;
 					}
-
-					//	Increase our iterators
-					InputEnd = (++Input == Input_End);
-					PatternEnd = (++Pattern == Pattern_End);
-					//	Check for pattern match
-					if (PatternEnd && InputEnd) {
-						//	Complete Match
-						std::cout << "Complete Match\n";
-						break;	// Break to next category
-					}
-					else if (PatternEnd) {
-						if (*--Pattern != "*") {
-							//	Partial Match
-							//	Pattern was fully matched
-							//	Input still has more words
-							std::cout << "Partial Match\n";
-							//	ToDo: Process the rest of 'Input'
-							break;	// Break to next category
-						}
-					}
-					else if (InputEnd) {
-						//	Incomplete Match
-						//	Pattern was not fully matched
-						//	Input ran out of words
-						if (Pattern != Pattern_Begin) {
-							std::cout << "Incomplete Match\n";
-						}
-						break;	// Break to next category
+				}
+				
+				// Complete match found
+				if (IsMatch && (PatternEnd || (Pattern != Pattern_End && *Pattern == "*"))) {
+					// Check Topic and That constraints
+					bool topicMatches = Cat.Topic.empty() || Cat.Topic == Topic;
+					bool thatMatches = Cat.That.empty() || Cat.That == That;
+					
+					if (topicMatches && thatMatches) {
+						Matches.push_back(&Cat);
 					}
 				}
 			}
-			return std::string("placeholder");
+			
+			// If there are matches, select one and generate a response
+			if (!Matches.empty()) {
+				// For now, just use the first match
+				Category* bestMatch = Matches[0];
+				
+				// Select a random template if there are multiple
+				int templateIdx = 0;
+				if (bestMatch->Templates.size() > 1) {
+					templateIdx = std::rand() % bestMatch->Templates.size();
+				}
+				
+				// Check for SRAI (symbolic reduction)
+				if (bestMatch->Srai) {
+					// Get the SRAI content
+					std::stringstream sraiContent;
+					for (auto& piece : bestMatch->Templates[templateIdx]) {
+						sraiContent << *piece;
+					}
+					
+					// Save current Stars
+					std::array<std::string, 8> savedStars = Stars;
+					
+					// Process SRAI recursively
+					std::string result = InputText(sraiContent.str());
+					
+					// Restore original Stars
+					Stars = savedStars;
+					
+					return result;
+				}
+				
+				// Store the current response as the new "that" context
+				std::stringstream responseStream;
+				for (auto& piece : bestMatch->Templates[templateIdx]) {
+					responseStream << *piece;
+				}
+				
+				That = responseStream.str();
+				return That;
+			}
+			
+			// Default response if no match found
+			That = "I'm not sure how to respond to that.";
+			return That;
 		}
 	};
 }
@@ -357,43 +509,5 @@ namespace AIML
 int main()
 {
 	AIML::Bot MyBot;
-	//std::system("PAUSE");
-	//MyBot.DebugCategories();
-	//std::system("PAUSE");
-	/*MyBot.DebugStars1();
-	MyBot.DebugCategories();
-	std::system("PAUSE");
-	MyBot.DebugStars2();
-	MyBot.DebugCategories();
-	std::system("PAUSE");*/
 
-	bool ExitProgram = false;
-	std::string InputText;
-	char c;
-
-	while (!ExitProgram) {
-		InputText = "";
-		while (std::cin.get(c) && c != '\n') {
-			InputText += c;
-		}
-		if (InputText == "quit" || InputText == "exit") {
-			ExitProgram = true;
-		}
-		else {
-			std::string Output = MyBot.InputText(InputText);
-			std::cout << "BOT: " << Output.c_str() << std::endl;
-		}
-	}
-	std::system("PAUSE");
-}
-
-// Run program: Ctrl + F5 or Debug > Start Without Debugging menu
-// Debug program: F5 or Debug > Start Debugging menu
-
-// Tips for Getting Started: 
-//   1. Use the Solution Explorer window to add/manage files
-//   2. Use the Team Explorer window to connect to source control
-//   3. Use the Output window to see build output and other messages
-//   4. Use the Error List window to view errors
-//   5. Go to Project > Add New Item to create new code files, or Project > Add Existing Item to add existing code files to the project
-//   6. In the future, to open this project again, go to File > Open > Project and select the .sln file
+	std
