@@ -119,23 +119,70 @@ namespace AIML
 			{
 				//	Encountered <random>
 				if (strcmp(node->name(), "random") == 0) {
-					// Need to store the beginning position of random templates
-					size_t randomStartIndex = Category_List.back().Templates.size();
-					
-					// Each <li> will add a template, we'll keep track of how many to choose one randomly later
-					int liCount = 0;
-					for (auto li_node = node->first_node("li"); li_node; li_node = li_node->next_sibling("li")) {
+					// Make sure we have a template to append to
+					if (Category_List.back().Templates.empty()) {
 						Category_List.back().Templates.emplace_back(std::list<std::string*>());
-						liCount++;
+					}
+					
+					std::vector<std::list<std::string*>> randomResponses;
+					
+					// Process each <li> element and build separate responses
+					for (auto li_node = node->first_node("li"); li_node; li_node = li_node->next_sibling("li")) {
+						// Create a new response for this option
+						randomResponses.emplace_back(std::list<std::string*>());
 						
-						// Process the content of this <li> element
-						for (auto content_node = li_node->first_node(); content_node; content_node = content_node->next_sibling()) {
-							WalkTemplate(content_node, IsThinking, IsSetting);
+						// Process text content directly in the <li> tag
+						if (li_node->value() && strlen(li_node->value()) > 0) {
+							randomResponses.back().push_back(new std::string(li_node->value()));
+							}
+						
+						// Process child nodes of this <li>
+						for (auto child = li_node->first_node(); child; child = child->next_sibling()) {
+							// Create a temporary Category to capture this li's template
+							Category tempCat("TEMP", "");
+							tempCat.Templates.emplace_back(std::list<std::string*>());
+							
+							// Save current category
+							Category* originalCat = &Category_List.back();
+							
+							// Temporarily replace with our temp category
+							Category_List.back() = tempCat;
+							
+							// Process the li's content
+							WalkTemplate(child, IsThinking);
+							
+							// Get the processed content
+							if (!Category_List.back().Templates.empty() && !Category_List.back().Templates.back().empty()) {
+								// Copy pointers to the random response
+								for (auto* piece : Category_List.back().Templates.back()) {
+									randomResponses.back().push_back(piece);
+								}
+								
+								// Clear pointers from temp category so they're not deleted
+								Category_List.back().Templates.back().clear();
+							}
+							
+							// Restore the original category
+							Category_List.back() = *originalCat;
+						}
+					}
+					
+					// Select a random response
+					if (!randomResponses.empty()) {
+						int randomIndex = std::rand() % randomResponses.size();
+						
+						// Add the chosen response to the current template
+						for (auto* piece : randomResponses[randomIndex]) {
+							Category_List.back().Templates.back().push_back(piece);
 						}
 						
-						// Also handle text directly in the <li> tag
-						if (li_node->value() && strlen(li_node->value()) > 0) {
-							Category_List.back().Templates.back().push_back(new std::string(li_node->value()));
+						// Delete unused responses to prevent memory leaks
+						for (size_t i = 0; i < randomResponses.size(); i++) {
+							if (i != randomIndex) {
+								for (auto* piece : randomResponses[i]) {
+									delete piece;
+								}
+							}
 						}
 					}
 					
@@ -187,30 +234,46 @@ namespace AIML
 					// Update reference to appropriate <set name='...'>...</set> value
 					auto VariableName = node->first_attribute("name");
 					if (VariableName) {
-						// Create or update the variable
 						std::string varName = VariableName->value();
-						Variables[varName] = "";
 						
-						// Create a temporary string to store the content
-						std::string* tempContent = new std::string();
+						// Create a temporary list to collect content pieces
+						std::list<std::string*> contentPieces;
+						std::string collectedContent;
 						
 						// Process child nodes to build content
 						for (auto child = node->first_node(); child; child = child->next_sibling()) {
-							// Get text content from child nodes
-							if (child->type() == rapidxml::node_data) {
-								*tempContent += child->value();
-							}
-							// Process other node types recursively if needed
+							// Save current template to restore after processing
+							auto currentTemplate = Category_List.back().Templates.back();
+							
+							// Set a temporary empty template for collecting content
+							Category_List.back().Templates.back() = contentPieces;
+							
+							// Process the child node
+							WalkTemplate(child, false, true);
+							
+							// Get back processed content
+							contentPieces = Category_List.back().Templates.back();
+							
+							// Restore original template
+							Category_List.back().Templates.back() = currentTemplate;
+						}
+						
+						// Collect text content
+						for (auto* piece : contentPieces) {
+							collectedContent += *piece;
+							delete piece;  // Clean up temporary pieces
+						}
+						
+						// Also handle direct text in the set tag
+						if (node->value() && strlen(node->value()) > 0) {
+							collectedContent += node->value();
 						}
 						
 						// Set the variable value
-						Variables[varName] = *tempContent;
+						Variables[varName] = collectedContent;
 						
 						// Add variable reference to template
 						Category_List.back().Templates.back().push_back(&Variables[varName]);
-						
-						// Clean up temporary string
-						delete tempContent;
 					}
 				}
 				else {
@@ -318,7 +381,7 @@ namespace AIML
 							ParseCategories(Root_Node);
 						}
 						catch (const rapidxml::parse_error & e) {
-							std::cout << "\tXML Error: " << e.what() << " - " << e.where<char>() << std::endl;
+							std::cout << "\tXML Error: " << e.what() << std::endl;
 						}
 					}
 				}
@@ -510,4 +573,21 @@ int main()
 {
 	AIML::Bot MyBot;
 
-	std
+	std::cout << "AIML Bot initialized. Type 'quit' or 'exit' to end." << std::endl;
+	bool ExitProgram = false;
+	std::string InputText;
+
+	while (!ExitProgram) {
+		std::cout << "USER: ";
+		std::getline(std::cin, InputText);
+
+		if (InputText == "quit" || InputText == "exit") {
+			ExitProgram = true;
+		}
+		else {
+			std::string Output = MyBot.InputText(InputText);
+			std::cout << "BOT: " << Output << std::endl;
+		}
+	}
+	std::system("PAUSE");
+}
